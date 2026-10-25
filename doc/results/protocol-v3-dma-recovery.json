@@ -671,6 +671,152 @@
           "size_bytes": 29061
         }
       ]
+    },
+    {
+      "action": "Resume retained job, then detach the unchanged controller under an exclusive flock; no remote job cancelled or duplicated",
+      "controller_lock_verification": "second nonblocking lock acquisition rejected while existing controller remains alive",
+      "controller_pid_at_checkpoint": 13490,
+      "controller_session_id": 13489,
+      "documentation_validation": {
+        "subtests_passed": 1435,
+        "tests_passed": 11
+      },
+      "freeze_check": "PASS",
+      "launcher_pid_at_checkpoint": 13489,
+      "matrix_snapshot": {
+        "fail": 0,
+        "not_complete": 50,
+        "pass": 6,
+        "required": 56
+      },
+      "next_accepted_job_id": "0b478afa-5698-4ed8-936f-a1a61d9d817a",
+      "prior_retained_file_hashes": "PASS",
+      "recorded_at_utc": "2026-10-25T03:33:26.167873+00:00",
+      "resumed_cell_id": "smoke-010001030104011000000c0040420f0040420f00",
+      "resumed_cell_outcome": "PASS",
+      "resumed_job_id": "1be9cd73-0384-4392-8e49-d80eff9a7b4e",
+      "retained_files": [
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "3ac5c353df00aa74633198634c7a4a4631b2ab8c7e3293d3f3e88e79f6239a06",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "567542f3333fb5994b43ce5dd27823122b096b8af5ee41eaf857f1db101bd9c7",
+          "size_bytes": 358
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "9c39d85a363dac39a3bcae23f99b841d6c006fa918e7ef384d3b6f58972019d0",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "322913b73249a36bca7c36f5c2aa77c63b195dd738cf4aaf6fc8714aeeafa6cd",
+          "size_bytes": 28241
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800010c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "53abee7db971a38a4168f70471da7b8a685fc33e6aabf06b9ca3781c57a04a48",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800010c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "389a8c2e212268ab5b14717f20b52aa996943db6cdc28913235222ec6b2a726c",
+          "size_bytes": 357
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800010c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "d45048dc01e616523447332e6aec285ad3ae21100c69ce006be43c066c3c999f",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800010c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "eae3a4b350067eb857b1928cd35877d2743a7e3c61416b3df2175269b348c591",
+          "size_bytes": 26650
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "94401a8ba6fcdf2b2a95735feaf6f8a946abb244e7d66937bfd004db5c579210",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "ef6f4cef5dd52c02b7ef658beac100e5de04a435965c9e9f63e1a1d870d0ee7c",
+          "size_bytes": 358
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "64915136f175424f69c26efadbd014b1a7afc68013847afc7f6fc0f7632c385e",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "d4766e7ea5b7c82bd5dc41e55d60f29c426dd0e1ca6371ef612835f65cfa3f50",
+          "size_bytes": 29061
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801010c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "35ba4d35c44ae2b09ee58b1138de73ede13e469ea41552e5a8ca9ca4b2d6e9c4",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801010c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "d3186893a91054a1048fc32f684366a3d1d0b5e7f71d93bc78d1aec6352c8190",
+          "size_bytes": 358
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801010c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "8baea198974155041fc1f8a6487ac87f3898c3b1d4f09b6fdd885afc9d18108e",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801010c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "d524fc2b86a38cd46ee6524b8fc2cc66efa1068bdcf6a8ca1c8394f512b2e1cf",
+          "size_bytes": 26242
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000000c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "e4678553b658d83d2216d42c66e5adbd0eaebb900b64af3343c46afcffe7577f",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000000c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "1552aa4bdf43a062e6e801fdd0acc22fe32eaa7a4244adf9f35cc1640cb67c6a",
+          "size_bytes": 358
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000000c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "b743ae890daf8f9b37d522f7f6f5133aedaee2bec4228fe7244264a3baaea5f0",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000000c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "65053d9db87b0ead8c3f3887777bc3cf29267bc72c9036809985cd1c3adc24bf",
+          "size_bytes": 28800
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000010c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "160ad9a794475a84e5f6a98b2c2c428f4b82005fcc2c84a86ef6b5a6121d1968",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000010c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "4b26c848e493d19124f3d10463280c270cf2e9631dedbdb0793f0b249bcf9569",
+          "size_bytes": 358
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000010c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "62436b2693138aff21bb232a71256ce4164ae43241cf2cb98d62425e936f0628",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104011000010c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "428238c4ea6eaf32f0c871b0ea4f636f423d9967f672f7dd16bbaa88fa1442a2",
+          "size_bytes": 26650
+        }
+      ]
     }
   ],
   "created": "2026-10-24",

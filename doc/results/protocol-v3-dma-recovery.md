@@ -99,3 +99,28 @@ Documentation/layout validation passed 11 tests and 1,435 subtests. The JSON
 `continuations` entry retains the resumed job's evidence hashes. Earlier
 checkpoint counts and failures remain unchanged; complete streaming, later
 qualification, and promotion remain uncredited.
+
+## Detached continuation checkpoint
+
+On 2026-10-24 (local date), saved job `1be9cd73-0384-4392-8e49-d80eff9a7b4e`
+completed PASS after queue residence, without resubmission. Independent replay
+gives **6/56 streaming PASS, zero FAIL, 50 incomplete**. The unsupported-request
+cell remains a separate PASS. Candidate freeze and all earlier retained
+evidence hashes verified.
+
+The unchanged controller now runs in detached session 13489, Python PID
+13490, under an exclusive `controller.lock` in the recovery work directory.
+It followed accepted job `0b478afa-5698-4ed8-936f-a1a61d9d817a` with `--resume`
+after the attached local monitor exited; no remote job was cancelled or
+duplicated. This launch keeps the controller independent of the chat's command
+session. Inspect live process, log, progress and saved job state before any
+future resume; checkpoint PIDs/counts are historical.
+
+The JSON continuation records the exact retained evidence hashes. All frozen
+health gates, queue handling and HTTP retry rules remain unchanged. Complete
+streaming, isolated pre-upgrade SDK, lifecycle/endurance and promotion remain
+uncredited.
+
+Documentation/layout checks passed 11 tests and 1,435 subtests. A second
+nonblocking lock acquisition was rejected while the detached controller stayed
+alive. No qualification inputs changed.
