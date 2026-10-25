@@ -1,0 +1,1192 @@
+{
+  "candidate": {
+    "artifact": {
+      "name": "firmware.ino.hex",
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    "board": {
+      "board_id": 1,
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+      "hardware_serial": "20428100",
+      "mcu_id": 1
+    },
+    "build_manifest_path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/build-manifest.json",
+    "build_manifest_sha256": "6189cedc517956373682c27279bce2219ff0cab0589971e53849207ccf088834",
+    "capabilities_hex": "00000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "firmware": {
+      "build_id": "thingdaq-92950ec5f7156586",
+      "source_id": "92950ec5f71565862251c63bd1d170a51045d43f383f89d93302681a228a41a2",
+      "version": [
+        1,
+        2,
+        0
+      ]
+    },
+    "firmware_sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+    "identity": {
+      "board_id": 1,
+      "build_id": "thingdaq-92950ec5f7156586",
+      "firmware_version": "1.2.0",
+      "hardware_serial": "20428100",
+      "mcu_id": 1
+    },
+    "inputs": {
+      "runner_sha256": {
+        "firmware/tests/rig_protocol_v3_qualification.py": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+        "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+        "firmware/tools/qualify_protocol_v3.py": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+        "firmware/tools/run_input_isolation.py": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5"
+      },
+      "schema_sha256": {
+        "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+        "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+      },
+      "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+      "sdk_version": "1.2.0"
+    },
+    "matrix": [
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104000800000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104000800010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104000800010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104000801000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104000801000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104000801010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104011000000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104011000010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104011000010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104011001000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104011001000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010001030104011001010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010001030104011001010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104000800000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104000800010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104000800010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104000801000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104000801000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104000801010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104011000000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104011000010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104011000010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104011001000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104011001000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-010101030104011001010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "010101030104011001010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104000800000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104000800010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104000800010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104000801000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104000801000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104000801010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104011000000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104011000010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104011000010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104011001000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104011001000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020001030104011001010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020001030104011001010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104000800000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104000800010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104000800010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104000801000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104000801000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104000801010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104011000000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104011000010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104011000010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104011001000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104011001000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-020101030104011001010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "020101030104011001010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104000800000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104000800010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104000800010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104000801000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104000801000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104000801010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104011000000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104011000010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104011000010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104011001000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104011001000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030001030104011001010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030001030104011001010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104000800000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104000800010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104000800010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104000801000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104000801000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104000801010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104011000000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104011000010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104011000010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104011001000c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104011001000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "smoke-030101030104011001010c0040420f0040420f00",
+        "kind": "smoke",
+        "seconds": 60,
+        "settings_hex": "030101030104011001010c0040420f0040420f00"
+      },
+      {
+        "alternate_hex": "030001030104000800000c0040420f0040420f00",
+        "cycles": 20,
+        "id": "same-boot-20",
+        "kind": "lifecycle",
+        "seconds": 1,
+        "settings_hex": "030001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "soak-1",
+        "kind": "soak",
+        "seconds": 600,
+        "settings_hex": "030001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "soak-2",
+        "kind": "soak",
+        "seconds": 600,
+        "settings_hex": "030001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "soak-3",
+        "kind": "soak",
+        "seconds": 600,
+        "settings_hex": "030001030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "stall-0",
+        "kind": "stall",
+        "seconds": 60,
+        "settings_hex": "030001030104000801010c0040420f0040420f00",
+        "stall_seconds": 0.25
+      },
+      {
+        "cycles": 1,
+        "id": "fallback-0",
+        "kind": "fallback",
+        "seconds": 60,
+        "settings_hex": "030101030104000801010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "v2-0-1",
+        "kind": "legacy",
+        "seconds": 60,
+        "settings_hex": "010001030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "v2-0-2",
+        "kind": "legacy",
+        "seconds": 60,
+        "settings_hex": "020001030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "v2-0-3",
+        "kind": "legacy",
+        "seconds": 60,
+        "settings_hex": "030001030104000800000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "stall-1",
+        "kind": "stall",
+        "seconds": 60,
+        "settings_hex": "030001030104011001010c0040420f0040420f00",
+        "stall_seconds": 0.25
+      },
+      {
+        "cycles": 1,
+        "id": "fallback-1",
+        "kind": "fallback",
+        "seconds": 60,
+        "settings_hex": "030101030104011001010c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "v2-1-1",
+        "kind": "legacy",
+        "seconds": 60,
+        "settings_hex": "010001030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "v2-1-2",
+        "kind": "legacy",
+        "seconds": 60,
+        "settings_hex": "020001030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "id": "v2-1-3",
+        "kind": "legacy",
+        "seconds": 60,
+        "settings_hex": "030001030104011000000c0040420f0040420f00"
+      },
+      {
+        "cycles": 1,
+        "expected_errors": {
+          "000001030104000801010c0040420f0040420f00": 5,
+          "010001030204000800000c0040420f0040420f00": 8,
+          "010001030204011000000c0040420f0040420f00": 8,
+          "010101030204000800000c0040420f0040420f00": 8,
+          "010101030204011000000c0040420f0040420f00": 8,
+          "020001030204000800000c0040420f0040420f00": 8,
+          "020001030204011000000c0040420f0040420f00": 8,
+          "020101030204000800000c0040420f0040420f00": 8,
+          "020101030204011000000c0040420f0040420f00": 8,
+          "030001030104000801010a0040420f0040420f00": 5,
+          "030001030104000801010c0040420f0080841e00": 8,
+          "030001030104000801010c0080841e0040420f00": 8,
+          "030001030104002001010c0040420f0040420f00": 5,
+          "030001030204000800000c0040420f0040420f00": 8,
+          "030001030204011000000c0040420f0040420f00": 8,
+          "030001030304000801010c0040420f0040420f00": 5,
+          "030101030204000800000c0040420f0040420f00": 8,
+          "030101030204011000000c0040420f0040420f00": 8
+        },
+        "id": "unsupported",
+        "kind": "negative",
+        "rejected_hex": [
+          "000001030104000801010c0040420f0040420f00",
+          "010001030204000800000c0040420f0040420f00",
+          "010001030204011000000c0040420f0040420f00",
+          "010101030204000800000c0040420f0040420f00",
+          "010101030204011000000c0040420f0040420f00",
+          "020001030204000800000c0040420f0040420f00",
+          "020001030204011000000c0040420f0040420f00",
+          "020101030204000800000c0040420f0040420f00",
+          "020101030204011000000c0040420f0040420f00",
+          "030001030104000801010a0040420f0040420f00",
+          "030001030104000801010c0040420f0080841e00",
+          "030001030104000801010c0080841e0040420f00",
+          "030001030104002001010c0040420f0040420f00",
+          "030001030204000800000c0040420f0040420f00",
+          "030001030204011000000c0040420f0040420f00",
+          "030001030304000801010c0040420f0040420f00",
+          "030101030204000800000c0040420f0040420f00",
+          "030101030204011000000c0040420f0040420f00"
+        ],
+        "seconds": 0,
+        "settings_hex": "030001030104000801010c0040420f0040420f00"
+      }
+    ],
+    "physical_qualification": "NOT_RUN",
+    "policy": "public-v3-qualification-1",
+    "protocol": {
+      "checksum_algorithm": 1,
+      "checksum_name": "ADLER32",
+      "version": 3
+    },
+    "retained_artifacts": {
+      "build_manifest": {
+        "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/build-manifest.json",
+        "sha256": "6189cedc517956373682c27279bce2219ff0cab0589971e53849207ccf088834",
+        "size_bytes": 55666
+      },
+      "distributions": [
+        {
+          "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0-py3-none-any.whl",
+          "sha256": "8ba2f35029405407582ef699e4cad3b2d3a210c93d11ffc0b64cff3eb36ee51c",
+          "size_bytes": 315618
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0.tar.gz",
+          "sha256": "701d4559e426591683eae72773c78d88de80d38e24c30516d860767dbbd0f22f",
+          "size_bytes": 346157
+        }
+      ],
+      "firmware": [
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/firmware.ino.eep",
+          "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+          "size_bytes": 34
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/firmware.ino.elf",
+          "sha256": "3ba99add100cead04f20eca6ef6bb5f7904153f904786edf121fd7c5c7d9b2d6",
+          "size_bytes": 2844736
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/firmware.ino.hex",
+          "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+          "size_bytes": 521404
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen/firmware.ino.map",
+          "sha256": "89bf506176d813dbf1f6680cbd34620be6129b2772fc47cc2a8cd5ce21679674",
+          "size_bytes": 1130316
+        }
+      ],
+      "inputs": [
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/firmware/tests/rig_protocol_v3_qualification.py",
+          "sha256": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+          "size_bytes": 21354
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/firmware/tools/protocol_v3_qualification.py",
+          "sha256": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+          "size_bytes": 18620
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/firmware/tools/qualify_protocol_v3.py",
+          "sha256": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+          "size_bytes": 18145
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/firmware/tools/run_input_isolation.py",
+          "sha256": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5",
+          "size_bytes": 31370
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+          "size_bytes": 104550
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/protocol/protocol-v2.json",
+          "sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+          "size_bytes": 148848
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/protocol/protocol-v3.json",
+          "sha256": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c",
+          "size_bytes": 119358
+        },
+        {
+          "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/inputs/sdk.zip",
+          "sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+          "size_bytes": 294298
+        }
+      ]
+    },
+    "schema_version": 1,
+    "source_dirty": false,
+    "source_revision": "c67872b3f854b192786a25e958a0c9ac2cf1bbc6"
+  },
+  "candidate_sha256": "5d6df850bd97add629502c9126c42eb1483ee2bd05efb1c0b466c55e5a92c1c7",
+  "created": "2026-10-24",
+  "freeze_commit": "811ab97",
+  "full_qualification_outcome": "INCONCLUSIVE",
+  "historical_candidate_sha256": "13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872",
+  "identity_job": "fad09eb5-7e64-48f5-8e4b-a95e247f4f48",
+  "limits": [
+    "Original FAILs and timing-altered diagnostic PASS preserved",
+    "Matrix is running; incomplete cells remain NOT_RUN/INCONCLUSIVE",
+    "Separate pre-upgrade SDK, lifecycle/endurance and release promotion remain uncredited",
+    "No analog accuracy or externally stimulated waveform fidelity claim"
+  ],
+  "local_validation": {
+    "expected_skips": 5,
+    "focused_subtests_passed": 79,
+    "focused_tests_passed": 55,
+    "protected_files": 499,
+    "reproducible_builds": 2,
+    "subtests_passed": 17055,
+    "tests_passed": 2657
+  },
+  "matrix_snapshot": {
+    "active_controller": "continue_qualification.py",
+    "campaign_path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024",
+    "fail": 0,
+    "not_complete": 55,
+    "pass": 1,
+    "required": 56
+  },
+  "metadata": {
+    "capture_run_ids": [
+      1,
+      2,
+      3
+    ],
+    "clock_measurements": 7,
+    "maximum_command_seconds": 0.09074717108160257,
+    "outcome": "PASS",
+    "steps": [
+      "boot defaults, identity, capabilities, clock diagnostic",
+      "stopped RAW/compressed changes and repeats",
+      "default/RAW/default acquisition and same-boot epochs",
+      "running configuration rejection",
+      "draining configuration rejection",
+      "serial close/reopen continuity"
+    ]
+  },
+  "metadata_job": "c58804d6-62d9-4f57-80d6-6cd454fd511c",
+  "negative_job": "a488b1ad-dae4-4d8a-86d1-97a6a0bf442c",
+  "negative_rejections": 18,
+  "original_failure_cell": {
+    "capture": {
+      "clock_measurements": [
+        {
+          "ccm_ccgr1_configured": 4244632320,
+          "ccm_ccgr2_configured": 218099763,
+          "ccm_ccgr5_configured": 4026744051,
+          "ccm_cscmr1_configured": 1729298496,
+          "dma_cr_configured": 1024,
+          "dma_erq_configured": 4,
+          "dma_err_final": 0,
+          "dma_es_final": 0,
+          "dma_hrs_final": 0,
+          "dma_sample_count": 8192,
+          "dmamux_chcfg_configured": 2147483678,
+          "dmamux_source": 30,
+          "dwt_counter_hz": 600000000,
+          "dwt_elapsed_cycles": 4915412,
+          "edma_channel": 2,
+          "edma_priority": 0,
+          "hardware_error_flags": 0,
+          "last_sample_word": 2781043326,
+          "pit_channel": 0,
+          "pit_clock_hz": 24000000,
+          "pit_cval_final": 23,
+          "pit_ldval_configured": 23,
+          "pit_load_value": 23,
+          "pit_mcr_configured": 0,
+          "pit_tctrl_configured": 1,
+          "pit_tflg_final": 1,
+          "production_rate_hz": 4000000,
+          "request": {
+            "event_count": 8192,
+            "rate_hz": 1000000
+          },
+          "scheduled_event_count": 8192,
+          "tcd_attr": 514,
+          "tcd_biter": 16400,
+          "tcd_citer_final": 8208,
+          "tcd_csr_final": 8,
+          "tcd_daddr": 539410852,
+          "tcd_nbytes": 4,
+          "tcd_saddr": 539410848,
+          "tcd_soff": 0,
+          "xbar_ctrl_configured": 5,
+          "xbar_input": 56,
+          "xbar_output": 0,
+          "xbar_sel_configured": 56
+        },
+        {
+          "ccm_ccgr1_configured": 4244632320,
+          "ccm_ccgr2_configured": 218099763,
+          "ccm_ccgr5_configured": 4026744051,
+          "ccm_cscmr1_configured": 1729298496,
+          "dma_cr_configured": 1024,
+          "dma_erq_configured": 4,
+          "dma_err_final": 0,
+          "dma_es_final": 0,
+          "dma_hrs_final": 0,
+          "dma_sample_count": 8192,
+          "dmamux_chcfg_configured": 2147483678,
+          "dmamux_source": 30,
+          "dwt_counter_hz": 600000000,
+          "dwt_elapsed_cycles": 4915424,
+          "edma_channel": 2,
+          "edma_priority": 0,
+          "hardware_error_flags": 0,
+          "last_sample_word": 2781043326,
+          "pit_channel": 0,
+          "pit_clock_hz": 24000000,
+          "pit_cval_final": 23,
+          "pit_ldval_configured": 23,
+          "pit_load_value": 23,
+          "pit_mcr_configured": 0,
+          "pit_tctrl_configured": 1,
+          "pit_tflg_final": 1,
+          "production_rate_hz": 4000000,
+          "request": {
+            "event_count": 8192,
+            "rate_hz": 1000000
+          },
+          "scheduled_event_count": 8192,
+          "tcd_attr": 514,
+          "tcd_biter": 16400,
+          "tcd_citer_final": 8208,
+          "tcd_csr_final": 8,
+          "tcd_daddr": 539410852,
+          "tcd_nbytes": 4,
+          "tcd_saddr": 539410848,
+          "tcd_soff": 0,
+          "xbar_ctrl_configured": 5,
+          "xbar_input": 56,
+          "xbar_output": 0,
+          "xbar_sel_configured": 56
+        }
+      ],
+      "clocks_after": {
+        "adc_clock_hz": 37500000,
+        "cpu_clock_hz": 600000000,
+        "cpu_profile": 1,
+        "ipg_clock_hz": 150000000,
+        "pit_clock_hz": 24000000,
+        "timestamp_hz": 8000000
+      },
+      "clocks_before": {
+        "adc_clock_hz": 37500000,
+        "cpu_clock_hz": 600000000,
+        "cpu_profile": 1,
+        "ipg_clock_hz": 150000000,
+        "pit_clock_hz": 24000000,
+        "timestamp_hz": 8000000
+      },
+      "duration_seconds": 60.00317673943937,
+      "host_queue_drops": 0,
+      "parser_errors": 0,
+      "readback_hex": "010001030104000800000c0040420f0040420f00",
+      "reader_delta": {
+        "adc_block_queue_drops": 0,
+        "adc_boundary_blocks_discarded": 21,
+        "adc_decoded_bytes_received": 240121728,
+        "adc_frames_received": 59554,
+        "adc_item_queue_drops": 0,
+        "adc_items_received": 60030432,
+        "adc_stale_blocks_discarded": 2,
+        "adc_wire_bytes_received": 243694968,
+        "block_queue_high_water": 31,
+        "boundary_blocks_discarded": 21,
+        "bytes_read": 243696568,
+        "disconnects": 0,
+        "event_queue_high_water": 0,
+        "frames_received": 59565,
+        "gpio_block_queue_drops": 0,
+        "gpio_boundary_blocks_discarded": 0,
+        "gpio_decoded_bytes_received": 0,
+        "gpio_frames_received": 0,
+        "gpio_item_queue_drops": 0,
+        "gpio_items_received": 0,
+        "gpio_stale_blocks_discarded": 0,
+        "gpio_wire_bytes_received": 0,
+        "host_block_queue_drops": 0,
+        "host_event_queue_drops": 0,
+        "late_responses": 0,
+        "loss_report_queue_drops": 0,
+        "maximum_read_bytes": 64084,
+        "pending_request_high_water": 0,
+        "pending_requests": 0,
+        "protocol_failures": 0,
+        "queue_wait_timeouts": 0,
+        "queued_blocks": 0,
+        "queued_events": 0,
+        "queued_loss_reports": 0,
+        "read_calls": 3723,
+        "readinto_calls": 0,
+        "request_timeouts": 0,
+        "responses_matched": 11,
+        "stale_blocks_discarded": 2
+      },
+      "run_id": 1,
+      "sdk_items": {
+        "adc": 60007248,
+        "gpio": 0
+      },
+      "settings_hex": "010001030104000800000c0040420f0040420f00",
+      "stall_seconds": 0,
+      "status": {
+        "adc_codec_completed": 0,
+        "adc_codec_deadline_drops": 0,
+        "adc_codec_max_age_ticks": 0,
+        "adc_codec_max_work_ticks": 0,
+        "adc_codec_raw": 0,
+        "adc_codec_resource_drops": 0,
+        "adc_codec_work_ticks": 0,
+        "adc_dma_error_events": 0,
+        "adc_encoded_bytes_transmitted": 240121728,
+        "adc_etc_error_events": 0,
+        "adc_frames_dropped": 0,
+        "adc_frames_produced": 59554,
+        "adc_items_dropped": 0,
+        "adc_items_per_frame": 1008,
+        "adc_items_produced": 60030432,
+        "adc_logical_bytes_transmitted": 240121728,
+        "adc_max_frame_bytes": 4092,
+        "adc_raw_invariant_errors": 0,
+        "adc_retention_ticks": 1612800,
+        "adc_wire_bytes_transmitted": 243694968,
+        "gpio_codec_completed": 0,
+        "gpio_codec_deadline_drops": 0,
+        "gpio_codec_max_age_ticks": 0,
+        "gpio_codec_max_work_ticks": 0,
+        "gpio_codec_raw": 0,
+        "gpio_codec_resource_drops": 0,
+        "gpio_codec_work_ticks": 0,
+        "gpio_encoded_bytes_transmitted": 0,
+        "gpio_frames_dropped": 0,
+        "gpio_frames_produced": 0,
+        "gpio_hardware_errors": 0,
+        "gpio_items_dropped": 0,
+        "gpio_items_per_frame": 4032,
+        "gpio_items_produced": 0,
+        "gpio_logical_bytes_transmitted": 0,
+        "gpio_max_frame_bytes": 4092,
+        "gpio_raw_invariant_errors": 0,
+        "gpio_retention_ticks": 6451200,
+        "gpio_wire_bytes_transmitted": 0,
+        "packet_encoding_rejections": 0,
+        "packet_invalid_operations": 0,
+        "packet_ready_high_water": 2,
+        "packet_transmit_high_water": 50,
+        "parser_errors": 0,
+        "pending_frames": 0,
+        "run_id": 1,
+        "state": 1,
+        "transport_errors": 0
+      },
+      "stopped": true,
+      "stream_anomalies": 0,
+      "temperatures": [
+        {
+          "attempt": 1,
+          "celsius": 44.036,
+          "host_monotonic_seconds": 5728532.358036043,
+          "phase": "before",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 45.878,
+          "host_monotonic_seconds": 5728542.560518895,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 47.72,
+          "host_monotonic_seconds": 5728552.586050479,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 48.948,
+          "host_monotonic_seconds": 5728562.611528149,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 50.176,
+          "host_monotonic_seconds": 5728572.63668393,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 51.404,
+          "host_monotonic_seconds": 5728582.662015253,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 52.632,
+          "host_monotonic_seconds": 5728592.95377018,
+          "phase": "after",
+          "status": "VALID"
+        }
+      ]
+    },
+    "cell": {
+      "cycles": 1,
+      "id": "smoke-010001030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104000800000c0040420f0040420f00"
+    },
+    "independent_validation_problems": [],
+    "job_id": "b72e07dd-0d94-4a18-b972-58e92788acc7",
+    "outcome": "PASS",
+    "wire_adc": {
+      "encoded_bytes": 240121728,
+      "encodings": {
+        "0": 59554
+      },
+      "end_item": 60030432,
+      "first_host_seconds": 5728532.529925104,
+      "first_ticks": 0,
+      "frames": 59554,
+      "gap_items": 0,
+      "items": 60030432,
+      "last_host_seconds": 5728592.592263491,
+      "last_ticks": 480235392,
+      "logical_bytes": 240121728,
+      "next_sequence": 59554,
+      "run_ids": [
+        1
+      ],
+      "sample_checks": 1,
+      "versions": [
+        3
+      ],
+      "wire_bytes": 243694968
+    }
+  },
+  "production_commit": "448e54a",
+  "promotion": "NOT_PERFORMED",
+  "recorded_at_utc": "2026-10-25T03:19:27.372775+00:00",
+  "recovery_outcome": "PASS",
+  "regression_commit": "c67872b",
+  "retained_files": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/provenance.json",
+      "sha256": "fd590159a5638b6d488480b17b85507c402cac21e08cb09e2d5d097e1ab753f4",
+      "size_bytes": 1536
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/results.json",
+      "sha256": "9cafaf87b72a75e008b6e25739a6ea8a7dfdbe6cf9a295f31f80ebd97ee8964d",
+      "size_bytes": 5245
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/rig-program.py",
+      "sha256": "f88ba1379c8693cd92efdcec6a4b0214f0df66fd5bf83bf3ab7bf94581a3fc22",
+      "size_bytes": 453735
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/start.json",
+      "sha256": "5792f3464a8efc0768dfe04fbe334ad230c805105c491f3eb6de74f739a6db54",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-job/submission.json",
+      "sha256": "e473a44943b2cf0fc6674a720045defb4b52817a09d35b3a7fb80b14ebabb178",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/provenance.json",
+      "sha256": "b387fbe07604e194392eda62b14df3f103cdfd481333ee446488147ad981b8db",
+      "size_bytes": 1463
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/results.json",
+      "sha256": "9dd0fea1d97926cf8aa63f3cc99e94c0f2be361ba9d7e1f324bd06a44b2cbb9a",
+      "size_bytes": 144796
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/rig-program.py",
+      "sha256": "321d38ca330e72ecd0e8e9133d2de664703f792427901f26889d36afcd410d4d",
+      "size_bytes": 462827
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/start.json",
+      "sha256": "86a7e190272876bbb60c8e88f982a07d554acbdd446d1301383d78a345fc25e1",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/metadata-job-v2/submission.json",
+      "sha256": "d06c8e3f010170150ed8b7b62ea32d869a72a65fd7f7b75a0f96d88372ad343c",
+      "size_bytes": 356
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/provenance.json",
+      "sha256": "c5e151a9be495d9c77f254acbdd10ed090c807643c34fd15d62a57a16433feb1",
+      "size_bytes": 3381
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/results.json",
+      "sha256": "45c05dd827973883248aa2a4d1453f2ad22e6a8d897f8155755360afd26a93f7",
+      "size_bytes": 14871
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/rig-program.py",
+      "sha256": "2d51d9bdb2a725c09a9ac5d16129c4560b581f7cb2e201f820be6955014fbd6c",
+      "size_bytes": 455403
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/start.json",
+      "sha256": "a090b633112714ba144f5cdfe28c1308f0b7850df6390a368227fb5623e485fa",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/unsupported/attempt-001/submission.json",
+      "sha256": "bc8e2315e43c670de75721b12c823a93d194b3f62a83d8adee9592db8711310f",
+      "size_bytes": 357
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/provenance.json",
+      "sha256": "3ac5c353df00aa74633198634c7a4a4631b2ab8c7e3293d3f3e88e79f6239a06",
+      "size_bytes": 1501
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/results.json",
+      "sha256": "322913b73249a36bca7c36f5c2aa77c63b195dd738cf4aaf6fc8714aeeafa6cd",
+      "size_bytes": 28241
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/rig-program.py",
+      "sha256": "9c66a5a58606a9bd5ca32ae9c91d81575a2d6b72ca142db97940bc3a8a702235",
+      "size_bytes": 453759
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/start.json",
+      "sha256": "9c39d85a363dac39a3bcae23f99b841d6c006fa918e7ef384d3b6f58972019d0",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000800000c0040420f0040420f00/attempt-001/submission.json",
+      "sha256": "567542f3333fb5994b43ce5dd27823122b096b8af5ee41eaf857f1db101bd9c7",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/full-tests.log",
+      "sha256": "b49622682733b14a675b73995d3900ea9040b7c47b033f3293dd0aaa0de6c00c",
+      "size_bytes": 3036
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/freeze-tests.log",
+      "sha256": "670d92817e23373e9bfef247547e820225d87b01da3c345393fc45002f6011f7",
+      "size_bytes": 221
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/first-build.log",
+      "sha256": "511983bcae0b3bafe48d26ce23278de52a38d6b9a5e4c6dfb6c3b97e4723d313",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/second-build.log",
+      "sha256": "511983bcae0b3bafe48d26ce23278de52a38d6b9a5e4c6dfb6c3b97e4723d313",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/freeze-validation.json",
+      "sha256": "1f077e38c76ecd47d994128450b6f376e794fce46f76d438f57174d21735a92f",
+      "size_bytes": 518
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/final-identity-validation.json",
+      "sha256": "5f328a5c5219ba2bdc50351926d862e7abd4f4329bf072edc31e43fd20089a81",
+      "size_bytes": 3888
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/independent-metadata-grade.json",
+      "sha256": "f0f66d1f9366c89bc8b0107dda1e0737e7a995ab487c98379aad92c0f4ab217a",
+      "size_bytes": 170402
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/continue_qualification.py",
+      "sha256": "77e1ef362a4914d0e69d3c30511c88fe4b9c3926f859241b4003a77b29eb3504",
+      "size_bytes": 3428
+    }
+  ],
+  "root_cause": "STOP CSR write while DONE set clears ESG; next major loop adds DLASTSGA to DADDR",
+  "schema_version": 1
+}
