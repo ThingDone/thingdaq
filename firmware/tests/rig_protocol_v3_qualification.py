@@ -564,6 +564,11 @@ def run(candidate, cell, transport):
                         "same-boot run reset/jump",
                     )
                     previous = run_id
+            if cell["kind"] == "legacy" and record["captures"]:
+                # capture() already issued v2 STOP and validated IDLE/empty
+                # ownership. The v3 facade must not send an extra v3 STOP on
+                # context exit while firmware still retains its v2 session.
+                daq.close(stop=False)
             record["outcome"] = "PASS"
     except Exception as error:  # noqa: BLE001 - preserve failed physical evidence
         record["outcome"] = "FAIL"
