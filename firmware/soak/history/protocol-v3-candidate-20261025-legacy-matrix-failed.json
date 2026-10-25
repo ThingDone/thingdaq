@@ -1,0 +1,640 @@
+{
+  "artifact": {
+    "name": "firmware.ino.hex",
+    "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.hex",
+    "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+    "size_bytes": 524284
+  },
+  "board": {
+    "board_id": 1,
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "hardware_serial": "20428100",
+    "mcu_id": 1
+  },
+  "build_manifest_path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/build-manifest.json",
+  "build_manifest_sha256": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa",
+  "capabilities_hex": "00000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "firmware": {
+    "build_id": "thingdaq-e0c750868be7c5c2",
+    "source_id": "e0c750868be7c5c29915dfd9a9e7ed614920e7ab614dbc9ca7a380bb0f488fe1",
+    "version": [
+      1,
+      2,
+      0
+    ]
+  },
+  "firmware_sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+  "identity": {
+    "board_id": 1,
+    "build_id": "thingdaq-e0c750868be7c5c2",
+    "firmware_version": "1.2.0",
+    "hardware_serial": "20428100",
+    "mcu_id": 1
+  },
+  "inputs": {
+    "runner_sha256": {
+      "firmware/soak/validator.py": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
+      "firmware/tests/rig_protocol_v3_qualification.py": "bd0473961e39413139da71edb4cc01eee0a127614e0484347bec706edd9c9ab4",
+      "firmware/tests/rig_release_sdk.py": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
+      "firmware/tools/protocol_v3_qualification.py": "ceedc3acd8ae2db35e7231cd7fe39ab541ce2b1f6388fc77d760f0ef8e5d19f2",
+      "firmware/tools/qualify_protocol_v3.py": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
+      "firmware/tools/run_input_isolation.py": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1"
+    },
+    "schema_sha256": {
+      "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+      "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+      "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+    },
+    "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+    "sdk_version": "1.2.0"
+  },
+  "matrix": [
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104000800010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104000800010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104000801000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104000801000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104000801010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104011000010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104011000010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104011001000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104011001000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010001030104011001010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010001030104011001010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104000800010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104000800010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104000801000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104000801000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104000801010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104011000010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104011000010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104011001000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104011001000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-010101030104011001010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "010101030104011001010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104000800010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104000800010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104000801000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104000801000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104000801010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104011000010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104011000010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104011001000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104011001000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020001030104011001010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020001030104011001010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104000800010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104000800010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104000801000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104000801000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104000801010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104011000010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104011000010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104011001000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104011001000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-020101030104011001010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "020101030104011001010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104000800010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104000800010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104000801000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104000801000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104000801010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104011000010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104011000010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104011001000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104011001000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030001030104011001010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104011001010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104000800000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104000800010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104000800010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104000801000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104000801000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104000801010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104011000010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104011000010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104011001000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104011001000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "smoke-030101030104011001010c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030101030104011001010c0040420f0040420f00"
+    },
+    {
+      "alternate_hex": "030001030104000800000c0040420f0040420f00",
+      "cycles": 20,
+      "id": "same-boot-20",
+      "kind": "lifecycle",
+      "seconds": 1,
+      "settings_hex": "030001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "soak-1",
+      "kind": "soak",
+      "seconds": 600,
+      "settings_hex": "030001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "soak-2",
+      "kind": "soak",
+      "seconds": 600,
+      "settings_hex": "030001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "soak-3",
+      "kind": "soak",
+      "seconds": 600,
+      "settings_hex": "030001030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "stall-0",
+      "kind": "stall",
+      "seconds": 60,
+      "settings_hex": "030001030104000801010c0040420f0040420f00",
+      "stall_seconds": 0.25
+    },
+    {
+      "cycles": 1,
+      "id": "fallback-0",
+      "kind": "fallback",
+      "seconds": 60,
+      "settings_hex": "030101030104000801010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "v2-0-1",
+      "kind": "legacy",
+      "seconds": 60,
+      "settings_hex": "010001030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "v2-0-2",
+      "kind": "legacy",
+      "seconds": 60,
+      "settings_hex": "020001030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "v2-0-3",
+      "kind": "legacy",
+      "seconds": 60,
+      "settings_hex": "030001030104000800000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "stall-1",
+      "kind": "stall",
+      "seconds": 60,
+      "settings_hex": "030001030104011001010c0040420f0040420f00",
+      "stall_seconds": 0.25
+    },
+    {
+      "cycles": 1,
+      "id": "fallback-1",
+      "kind": "fallback",
+      "seconds": 60,
+      "settings_hex": "030101030104011001010c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "v2-1-1",
+      "kind": "legacy",
+      "seconds": 60,
+      "settings_hex": "010001030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "v2-1-2",
+      "kind": "legacy",
+      "seconds": 60,
+      "settings_hex": "020001030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "id": "v2-1-3",
+      "kind": "legacy",
+      "seconds": 60,
+      "settings_hex": "030001030104011000000c0040420f0040420f00"
+    },
+    {
+      "cycles": 1,
+      "expected_errors": {
+        "000001030104000801010c0040420f0040420f00": 5,
+        "010001030204000800000c0040420f0040420f00": 8,
+        "010001030204011000000c0040420f0040420f00": 8,
+        "010101030204000800000c0040420f0040420f00": 8,
+        "010101030204011000000c0040420f0040420f00": 8,
+        "020001030204000800000c0040420f0040420f00": 8,
+        "020001030204011000000c0040420f0040420f00": 8,
+        "020101030204000800000c0040420f0040420f00": 8,
+        "020101030204011000000c0040420f0040420f00": 8,
+        "030001030104000801010a0040420f0040420f00": 5,
+        "030001030104000801010c0040420f0080841e00": 8,
+        "030001030104000801010c0080841e0040420f00": 8,
+        "030001030104002001010c0040420f0040420f00": 5,
+        "030001030204000800000c0040420f0040420f00": 8,
+        "030001030204011000000c0040420f0040420f00": 8,
+        "030001030304000801010c0040420f0040420f00": 5,
+        "030101030204000800000c0040420f0040420f00": 8,
+        "030101030204011000000c0040420f0040420f00": 8
+      },
+      "id": "unsupported",
+      "kind": "negative",
+      "rejected_hex": [
+        "000001030104000801010c0040420f0040420f00",
+        "010001030204000800000c0040420f0040420f00",
+        "010001030204011000000c0040420f0040420f00",
+        "010101030204000800000c0040420f0040420f00",
+        "010101030204011000000c0040420f0040420f00",
+        "020001030204000800000c0040420f0040420f00",
+        "020001030204011000000c0040420f0040420f00",
+        "020101030204000800000c0040420f0040420f00",
+        "020101030204011000000c0040420f0040420f00",
+        "030001030104000801010a0040420f0040420f00",
+        "030001030104000801010c0040420f0080841e00",
+        "030001030104000801010c0080841e0040420f00",
+        "030001030104002001010c0040420f0040420f00",
+        "030001030204000800000c0040420f0040420f00",
+        "030001030204011000000c0040420f0040420f00",
+        "030001030304000801010c0040420f0040420f00",
+        "030101030204000800000c0040420f0040420f00",
+        "030101030204011000000c0040420f0040420f00"
+      ],
+      "seconds": 0,
+      "settings_hex": "030001030104000801010c0040420f0040420f00"
+    }
+  ],
+  "physical_qualification": "NOT_RUN",
+  "policy": "public-v3-qualification-1",
+  "protocol": {
+    "checksum_algorithm": 1,
+    "checksum_name": "ADLER32",
+    "version": 3
+  },
+  "retained_artifacts": {
+    "build_manifest": {
+      "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/build-manifest.json",
+      "sha256": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa",
+      "size_bytes": 55667
+    },
+    "distributions": [
+      {
+        "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0-py3-none-any.whl",
+        "sha256": "8ba2f35029405407582ef699e4cad3b2d3a210c93d11ffc0b64cff3eb36ee51c",
+        "size_bytes": 315618
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0.tar.gz",
+        "sha256": "701d4559e426591683eae72773c78d88de80d38e24c30516d860767dbbd0f22f",
+        "size_bytes": 346157
+      }
+    ],
+    "firmware": [
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.eep",
+        "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "size_bytes": 34
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.elf",
+        "sha256": "62c71b96f33b7e32974816056ab234bbca4f8d08e42a52c184cc11e0e16805c1",
+        "size_bytes": 2845968
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.hex",
+        "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+        "size_bytes": 524284
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.map",
+        "sha256": "fcb8d88c8073b1bd5f795ccbe395cc6e44785288a02373c4387a7acb0df4ebd9",
+        "size_bytes": 1130361
+      }
+    ],
+    "inputs": [
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/sdk.zip",
+        "sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+        "size_bytes": 294298
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tests/rig_protocol_v3_qualification.py",
+        "sha256": "bd0473961e39413139da71edb4cc01eee0a127614e0484347bec706edd9c9ab4",
+        "size_bytes": 25255
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tools/protocol_v3_qualification.py",
+        "sha256": "ceedc3acd8ae2db35e7231cd7fe39ab541ce2b1f6388fc77d760f0ef8e5d19f2",
+        "size_bytes": 21936
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tools/qualify_protocol_v3.py",
+        "sha256": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
+        "size_bytes": 22398
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tools/run_input_isolation.py",
+        "sha256": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1",
+        "size_bytes": 31595
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tests/rig_release_sdk.py",
+        "sha256": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
+        "size_bytes": 11117
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/soak/validator.py",
+        "sha256": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
+        "size_bytes": 166525
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/protocol/protocol-v1.json",
+        "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "size_bytes": 104550
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/protocol/protocol-v2.json",
+        "sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+        "size_bytes": 148848
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/protocol/protocol-v3.json",
+        "sha256": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c",
+        "size_bytes": 119358
+      }
+    ]
+  },
+  "schema_version": 1,
+  "source_dirty": false,
+  "source_revision": "13ece93db8658342462becb6f3160fabf09a0274"
+}

@@ -1,7 +1,7 @@
 {
   "artifact": {
     "name": "firmware.ino.hex",
-    "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.hex",
+    "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.hex",
     "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
     "size_bytes": 524284
   },
@@ -11,8 +11,8 @@
     "hardware_serial": "20428100",
     "mcu_id": 1
   },
-  "build_manifest_path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/build-manifest.json",
-  "build_manifest_sha256": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa",
+  "build_manifest_path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/build-manifest.json",
+  "build_manifest_sha256": "67623f384bda202af48c3268de7d44d94fcc48ffdada593012a00352a4bd421d",
   "capabilities_hex": "00000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
   "firmware": {
     "build_id": "thingdaq-e0c750868be7c5c2",
@@ -36,7 +36,7 @@
       "firmware/soak/validator.py": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
       "firmware/tests/rig_protocol_v3_qualification.py": "bd0473961e39413139da71edb4cc01eee0a127614e0484347bec706edd9c9ab4",
       "firmware/tests/rig_release_sdk.py": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
-      "firmware/tools/protocol_v3_qualification.py": "ceedc3acd8ae2db35e7231cd7fe39ab541ce2b1f6388fc77d760f0ef8e5d19f2",
+      "firmware/tools/protocol_v3_qualification.py": "d709e4314453a7a67f14ae4405635b382cb816a68fb451e0bff75d9115cbbdf6",
       "firmware/tools/qualify_protocol_v3.py": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
       "firmware/tools/run_input_isolation.py": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1"
     },
@@ -467,13 +467,6 @@
     },
     {
       "cycles": 1,
-      "id": "v2-1-1",
-      "kind": "legacy",
-      "seconds": 60,
-      "settings_hex": "010001030104011000000c0040420f0040420f00"
-    },
-    {
-      "cycles": 1,
       "id": "v2-1-2",
       "kind": "legacy",
       "seconds": 60,
@@ -543,8 +536,8 @@
   },
   "retained_artifacts": {
     "build_manifest": {
-      "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/build-manifest.json",
-      "sha256": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa",
+      "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/build-manifest.json",
+      "sha256": "67623f384bda202af48c3268de7d44d94fcc48ffdada593012a00352a4bd421d",
       "size_bytes": 55667
     },
     "distributions": [
@@ -561,74 +554,74 @@
     ],
     "firmware": [
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.elf",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.elf",
         "sha256": "62c71b96f33b7e32974816056ab234bbca4f8d08e42a52c184cc11e0e16805c1",
         "size_bytes": 2845968
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.hex",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.hex",
         "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
         "size_bytes": 524284
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.map",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.map",
         "sha256": "fcb8d88c8073b1bd5f795ccbe395cc6e44785288a02373c4387a7acb0df4ebd9",
         "size_bytes": 1130361
       }
     ],
     "inputs": [
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/sdk.zip",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/sdk.zip",
         "sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
         "size_bytes": 294298
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tests/rig_protocol_v3_qualification.py",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/firmware/tests/rig_protocol_v3_qualification.py",
         "sha256": "bd0473961e39413139da71edb4cc01eee0a127614e0484347bec706edd9c9ab4",
         "size_bytes": 25255
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tools/protocol_v3_qualification.py",
-        "sha256": "ceedc3acd8ae2db35e7231cd7fe39ab541ce2b1f6388fc77d760f0ef8e5d19f2",
-        "size_bytes": 21936
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/firmware/tools/protocol_v3_qualification.py",
+        "sha256": "d709e4314453a7a67f14ae4405635b382cb816a68fb451e0bff75d9115cbbdf6",
+        "size_bytes": 22195
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tools/qualify_protocol_v3.py",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/firmware/tools/qualify_protocol_v3.py",
         "sha256": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
         "size_bytes": 22398
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tools/run_input_isolation.py",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/firmware/tools/run_input_isolation.py",
         "sha256": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1",
         "size_bytes": 31595
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/tests/rig_release_sdk.py",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/firmware/tests/rig_release_sdk.py",
         "sha256": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
         "size_bytes": 11117
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/firmware/soak/validator.py",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/firmware/soak/validator.py",
         "sha256": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
         "size_bytes": 166525
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/protocol/protocol-v1.json",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/protocol/protocol-v1.json",
         "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
         "size_bytes": 104550
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/protocol/protocol-v2.json",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/protocol/protocol-v2.json",
         "sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
         "size_bytes": 148848
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/inputs/protocol/protocol-v3.json",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/protocol/protocol-v3.json",
         "sha256": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c",
         "size_bytes": 119358
       }
@@ -636,5 +629,5 @@
   },
   "schema_version": 1,
   "source_dirty": false,
-  "source_revision": "13ece93db8658342462becb6f3160fabf09a0274"
+  "source_revision": "94144fd32b35968c3f650d2c5927cfefd4e88343"
 }

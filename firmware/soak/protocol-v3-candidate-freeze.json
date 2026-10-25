@@ -733,7 +733,7 @@
       "build_id": "thingdaq-e0c750868be7c5c2",
       "firmware_input_changes": [],
       "firmware_inputs_clean": true,
-      "git_commit": "13ece93db8658342462becb6f3160fabf09a0274",
+      "git_commit": "94144fd32b35968c3f650d2c5927cfefd4e88343",
       "inputs": [
         "firmware/firmware.ino",
         "firmware/src/acquisition_controller.cpp",
@@ -850,12 +850,12 @@
     "build_id": "thingdaq-e0c750868be7c5c2",
     "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
     "path": "firmware/soak/protocol-v3-candidate.json",
-    "sha256": "16f11b967bbf5c59a651adaa196a7f4ebd556b6347b099833588ce546bfcefd5",
+    "sha256": "14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682",
     "source_id": "e0c750868be7c5c29915dfd9a9e7ed614920e7ab614dbc9ca7a380bb0f488fe1"
   },
-  "created_utc": "2026-10-25T10:17:45+00:00",
+  "created_utc": "2026-10-25T10:45:03+00:00",
   "protected": {
-    "base_git_commit": "13ece93db8658342462becb6f3160fabf09a0274",
+    "base_git_commit": "94144fd32b35968c3f650d2c5927cfefd4e88343",
     "file_count": 500,
     "files": [
       {
@@ -2410,8 +2410,8 @@
       },
       {
         "path": "firmware/tests/test_protocol_v3_qualification.py",
-        "sha256": "e81d7a55ce0ca0d88a5ff1e3dbd57f3c7d54c02863a19f3ceb6ab28e8556afd9",
-        "size_bytes": 52882
+        "sha256": "00d702aa19e226f68a15de79544f89139a6bd85bc32fb0ccd9cd8375ddcfdd6e",
+        "size_bytes": 54680
       },
       {
         "path": "firmware/tests/test_rig_adc_capture.py",
@@ -2625,8 +2625,8 @@
       },
       {
         "path": "firmware/tools/protocol_v3_qualification.py",
-        "sha256": "ceedc3acd8ae2db35e7231cd7fe39ab541ce2b1f6388fc77d760f0ef8e5d19f2",
-        "size_bytes": 21936
+        "sha256": "d709e4314453a7a67f14ae4405635b382cb816a68fb451e0bff75d9115cbbdf6",
+        "size_bytes": 22195
       },
       {
         "path": "firmware/tools/qualify_protocol_v3.py",
@@ -3359,7 +3359,7 @@
         "size_bytes": 173030
       }
     ],
-    "tree_sha256": "df762b6501b271e75c15f8e1edf46a40578bfea9035822393d423b0518d75b7c"
+    "tree_sha256": "d02080ae36ecfb029c2baeda2e2bb42b9f1a3f0e7a7c566a83ac31c91b2a945c"
   },
   "reproducibility": {
     "artifacts": [
@@ -3387,36 +3387,36 @@
     "build_count": 2,
     "byte_identical": true,
     "manifest_sha256": {
-      "first": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa",
-      "second": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa"
+      "first": "67623f384bda202af48c3268de7d44d94fcc48ffdada593012a00352a4bd421d",
+      "second": "67623f384bda202af48c3268de7d44d94fcc48ffdada593012a00352a4bd421d"
     }
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen",
+    "directory": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/build-manifest.json",
-        "sha256": "86cb72f646b94d1d758e0654419f9732fb7ee2e0ff795a8bb43b9d741192ddaa",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/build-manifest.json",
+        "sha256": "67623f384bda202af48c3268de7d44d94fcc48ffdada593012a00352a4bd421d",
         "size_bytes": 55667
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.elf",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.elf",
         "sha256": "62c71b96f33b7e32974816056ab234bbca4f8d08e42a52c184cc11e0e16805c1",
         "size_bytes": 2845968
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.hex",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.hex",
         "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
         "size_bytes": 524284
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-legacy-tail-corrected-20261025/frozen/firmware.ino.map",
+        "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.map",
         "sha256": "fcb8d88c8073b1bd5f795ccbe395cc6e44785288a02373c4387a7acb0df4ebd9",
         "size_bytes": 1130361
       }
