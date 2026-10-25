@@ -15,12 +15,12 @@ related:
   - '[[protocol-v3-migration]]'
 ---
 
-# Streaming and compatibility: INCONCLUSIVE
+# Streaming and compatibility: FAIL
 
-The exact corrected candidate has **40/56 streaming cells PASS**,
-**0 FAIL**, and **16 NOT_RUN**. Isolated pre-upgrade
+The exact corrected candidate has **48/56 streaming cells PASS**,
+**1 FAIL**, and **7 NOT_RUN**. Isolated pre-upgrade
 SDK physical compatibility: **NOT_RUN**. The unsupported-request cell
-is separate. Full release qualification remains **INCONCLUSIVE**;
+is separate. Full release qualification remains **FAIL**;
 remaining lifecycle, backpressure, endurance, grading and promotion tasks have
 not been credited here.
 
@@ -54,10 +54,47 @@ verified two-core quota/affinity before opening serial. The machine-readable
 report preserves counters and per-cell grades; raw frames remain in the
 hash-linked original result files.
 
+## Retained fallback failure and diagnosis
+
+Job `56729135-cdc1-4883-9be7-616f9dde45b1`, cell `fallback-0`, failed with
+`RLE/RAW fallback unobserved`. It completed 60.006258 seconds,
+60,034,464 ADC pairs and 60,032,448 GPIO samples. All
+14,889 GPIO frames used RAW; none used RLE. The firmware's
+RAW counter agrees. Loss/gap, DMA, parser, host-drop and capture CPU-throttling
+counters are zero; STOPPED has zero pending frames. Peak die temperature was
+61.229 °C. Independent grading identified no other capture
+criterion failure. This remains an authoritative **FAIL**.
+
+The frozen firmware generator increments every GPIO sample
+(`SyntheticSource::gpioByte` / `fillGpio`). The retained 4,032-sample RAW frame
+matches that counter bit-for-bit and contains 4,032 distinct adjacent runs:
+RLE would require 12,096 payload bytes versus 4,032 RAW bytes. The encoder's
+strict profitability rule therefore correctly chooses RAW. The qualification
+fallback cell nevertheless demands RAW and RLE in the same synthetic capture.
+There is no compressible phase in that generator. The local qualification
+`measured_fixture` supplies both encoding counts directly, so it did not expose
+the stimulus mismatch. Existing portable codec pipeline/deferred tests,
+including constant and incompressible patterns: **8 passed in 17.03s**.
+
+This diagnoses a fallback stimulus/acceptance coverage mismatch, not a
+sample-loss recurrence. Correct the stimulus/coverage design and add independent
+generator-to-validator regression before proceeding. Any changed frozen inputs
+require a new candidate and invalidated qualification reruns. No firmware,
+runner, SDK, policy, threshold or matrix correction was applied here; no gate
+was waived. No new rig job was submitted after this failure.
+
+The controller exited with failure and released its lock. Its `--resume`
+preflight refuses further submissions while this retained FAIL exists. Prior
+ACTIVE checkpoint notes are historical. Seven streaming cells, isolated old-SDK
+physical compatibility and all later tasks remain pending. There is no Auto Run
+halt marker: this is an ordinary qualification failure requiring correction,
+not a human setup gate.
+
 ## Completed streaming cells
 
 | Cell | Grade | Job | Capture seconds | ADC pairs | GPIO samples |
 | --- | --- | --- | ---: | ---: | ---: |
+| `fallback-0` | FAIL | `56729135-cdc1-4883-9be7-616f9dde45b1` | 60.006258244626224 | 60034464 | 60032448 |
 | `smoke-010001030104000800000c0040420f0040420f00` | PASS | `eb1cbc1f-6dea-4cdf-a84a-241c1f46ad86` | 60.00171210616827 | 60027408 | 0 |
 | `smoke-010001030104000800010c0040420f0040420f00` | PASS | `ca4aae0c-d0fa-4aa9-9afa-dfedac8fe2a8` | 60.00181107688695 | 60031440 | 0 |
 | `smoke-010001030104000801000c0040420f0040420f00` | PASS | `6ed0a5ba-b183-471d-ad58-757af2310e34` | 60.00972013361752 | 60030432 | 0 |
@@ -98,6 +135,14 @@ hash-linked original result files.
 | `smoke-030001030104011000010c0040420f0040420f00` | PASS | `3cd9779c-6670-4cb7-893b-eb6538d83aaf` | 60.0076174614951 | 60026400 | 60026400 |
 | `smoke-030001030104011001000c0040420f0040420f00` | PASS | `811145c6-02cd-4067-8709-52a9fcd5db20` | 60.00058246590197 | 60027408 | 60026400 |
 | `smoke-030001030104011001010c0040420f0040420f00` | PASS | `50929cb2-41b7-448a-b0a8-206cf200a0a6` | 60.013181107118726 | 60047568 | 60046560 |
+| `smoke-030101030104000800000c0040420f0040420f00` | PASS | `29cbba0f-1bfa-4cf7-a311-60bb2d727d41` | 60.011768472380936 | 60034464 | 60032448 |
+| `smoke-030101030104000800010c0040420f0040420f00` | PASS | `270fde5d-9c65-43df-85e8-90fd6bcec45e` | 60.01051164697856 | 60034464 | 60032448 |
+| `smoke-030101030104000801000c0040420f0040420f00` | PASS | `60422ef8-b9ec-4b8f-bd3a-60b9a35c3d45` | 60.000002822838724 | 60021360 | 60020352 |
+| `smoke-030101030104000801010c0040420f0040420f00` | PASS | `828701ac-b5e3-4201-9290-4de2786de00a` | 60.00618698447943 | 60034464 | 60032448 |
+| `smoke-030101030104011000000c0040420f0040420f00` | PASS | `31b68df1-d6e9-4f16-84af-406c5e6f0fcf` | 60.007976269349456 | 60027408 | 60026400 |
+| `smoke-030101030104011000010c0040420f0040420f00` | PASS | `153587f9-5887-4eb4-a74b-e86a9f4f14c8` | 60.001818309538066 | 60026400 | 60026400 |
+| `smoke-030101030104011001000c0040420f0040420f00` | PASS | `3c70b5f4-b8b2-4625-a07a-069e6dcc5b05` | 60.007544569671154 | 60027408 | 60026400 |
+| `smoke-030101030104011001010c0040420f0040420f00` | PASS | `5d6e4695-1d19-4fbf-9559-423a5f2540b1` | 60.003399468027055 | 60026400 | 60026400 |
 
 ## Retention and continuation
 
