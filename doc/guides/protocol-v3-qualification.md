@@ -123,6 +123,21 @@ counts; SDK queue loss or wire corruption still fails. Codec deadline/resource
 drop counters are retained, and normal cells require zero. Fallback cells
 must observe both encodings and a nonzero firmware RAW counter.
 
+Public-v3 synthetic GPIO alternates all-zero even logical frames with
+high-transition odd logical frames. Odd-frame primary bytes alternate `0xAA`
+and `0x55`; GPIO16 auxiliary bytes alternate `0x0F` and `0xF0`, using the
+absolute sample index parity. ADC uses the 12-bit channel ramps except for
+pairs 0–3 of each 2,048-pair cycle: `(0,0)`, `(4095,4095)`, `(0xABC,0x123)`,
+and `(0x555,0xAAA)`. These are the existing SDK validator/simulator patterns;
+legacy v1/v2 sources retain their previous formulas.
+
+The rig independently checks source bytes and SDK decoding for one complete
+frame per observed encoding per stream, and retains those frames. Framing,
+checksums, sequence and conservation checks cover all frames. Source checks
+are bounded samples, not an all-payload replay of the entire capture. The
+portable regression drives the actual firmware generator through control,
+codecs and USB and validates every emitted block against the SDK pattern.
+
 Die temperature is sampled before, during (at most ten seconds apart), and
 after capture. At **80 °C or above**, the worker aborts and attempts STOP in
 `finally`. `NOT_READY` retries retain every reading and are bounded by one

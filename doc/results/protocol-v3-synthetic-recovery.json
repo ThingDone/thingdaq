@@ -1,0 +1,318 @@
+{
+  "campaign_validation": {
+    "attempts": [],
+    "checks": {
+      "all_attempts_valid": true,
+      "matrix_complete": false,
+      "physical_evidence_present": false
+    },
+    "endurance": "three separate reflashed 600-second jobs; lifecycle is same-boot only",
+    "missing_cells": [
+      "fallback-0",
+      "fallback-1",
+      "same-boot-20",
+      "smoke-010001030104000800000c0040420f0040420f00",
+      "smoke-010001030104000800010c0040420f0040420f00",
+      "smoke-010001030104000801000c0040420f0040420f00",
+      "smoke-010001030104000801010c0040420f0040420f00",
+      "smoke-010001030104011000000c0040420f0040420f00",
+      "smoke-010001030104011000010c0040420f0040420f00",
+      "smoke-010001030104011001000c0040420f0040420f00",
+      "smoke-010001030104011001010c0040420f0040420f00",
+      "smoke-010101030104000800000c0040420f0040420f00",
+      "smoke-010101030104000800010c0040420f0040420f00",
+      "smoke-010101030104000801000c0040420f0040420f00",
+      "smoke-010101030104000801010c0040420f0040420f00",
+      "smoke-010101030104011000000c0040420f0040420f00",
+      "smoke-010101030104011000010c0040420f0040420f00",
+      "smoke-010101030104011001000c0040420f0040420f00",
+      "smoke-010101030104011001010c0040420f0040420f00",
+      "smoke-020001030104000800000c0040420f0040420f00",
+      "smoke-020001030104000800010c0040420f0040420f00",
+      "smoke-020001030104000801000c0040420f0040420f00",
+      "smoke-020001030104000801010c0040420f0040420f00",
+      "smoke-020001030104011000000c0040420f0040420f00",
+      "smoke-020001030104011000010c0040420f0040420f00",
+      "smoke-020001030104011001000c0040420f0040420f00",
+      "smoke-020001030104011001010c0040420f0040420f00",
+      "smoke-020101030104000800000c0040420f0040420f00",
+      "smoke-020101030104000800010c0040420f0040420f00",
+      "smoke-020101030104000801000c0040420f0040420f00",
+      "smoke-020101030104000801010c0040420f0040420f00",
+      "smoke-020101030104011000000c0040420f0040420f00",
+      "smoke-020101030104011000010c0040420f0040420f00",
+      "smoke-020101030104011001000c0040420f0040420f00",
+      "smoke-020101030104011001010c0040420f0040420f00",
+      "smoke-030001030104000800000c0040420f0040420f00",
+      "smoke-030001030104000800010c0040420f0040420f00",
+      "smoke-030001030104000801000c0040420f0040420f00",
+      "smoke-030001030104000801010c0040420f0040420f00",
+      "smoke-030001030104011000000c0040420f0040420f00",
+      "smoke-030001030104011000010c0040420f0040420f00",
+      "smoke-030001030104011001000c0040420f0040420f00",
+      "smoke-030001030104011001010c0040420f0040420f00",
+      "smoke-030101030104000800000c0040420f0040420f00",
+      "smoke-030101030104000800010c0040420f0040420f00",
+      "smoke-030101030104000801000c0040420f0040420f00",
+      "smoke-030101030104000801010c0040420f0040420f00",
+      "smoke-030101030104011000000c0040420f0040420f00",
+      "smoke-030101030104011000010c0040420f0040420f00",
+      "smoke-030101030104011001000c0040420f0040420f00",
+      "smoke-030101030104011001010c0040420f0040420f00",
+      "soak-1",
+      "soak-2",
+      "soak-3",
+      "stall-0",
+      "stall-1",
+      "unsupported",
+      "v2-0-1",
+      "v2-0-2",
+      "v2-0-3",
+      "v2-1-1",
+      "v2-1-2",
+      "v2-1-3"
+    ],
+    "outcome": "NOT_RUN",
+    "physical_qualification": "NOT_RUN",
+    "policy": "public-v3-qualification-1",
+    "problems": []
+  },
+  "candidate_sha256": "7bb97a0aa37b9d2c3d00b38ed322accfacc97143af063ad9160ecb28865265b8",
+  "controller_state": {
+    "stage": "FROZEN"
+  },
+  "correction_commits": [
+    "70689d9",
+    "75ca24c",
+    "1a1fc95",
+    "6eda739"
+  ],
+  "created": "2026-10-25",
+  "firmware_sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+  "freeze_validation": {
+    "artifact_sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+    "build_id": "thingdaq-e0c750868be7c5c2",
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "protected_file_count": 499,
+    "protected_tree_sha256": "c3978b9c0c2f943cbd689c48bd23774839ef933e59ecf35806a95bed17f732d6",
+    "result": "PASS",
+    "source_id": "e0c750868be7c5c29915dfd9a9e7ed614920e7ab614dbc9ca7a380bb0f488fe1",
+    "staged_directory": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/frozen-final"
+  },
+  "historical_files_verified": {
+    "failed_campaign_and_reports": 462,
+    "previous": 316
+  },
+  "identity": {
+    "board_id": 1,
+    "build_id": "thingdaq-e0c750868be7c5c2",
+    "firmware_version": "1.2.0",
+    "hardware_serial": "20428100",
+    "mcu_id": 1
+  },
+  "inputs": {
+    "runner_sha256": {
+      "firmware/soak/validator.py": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
+      "firmware/tests/rig_protocol_v3_qualification.py": "f371d18b3866cfa8b93226f744f455014c07e395edc41febdf5697945b7e1f20",
+      "firmware/tests/rig_release_sdk.py": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
+      "firmware/tools/protocol_v3_qualification.py": "dae99095e3f9ef432d1d76bac34e7c087668ef2d805d9c90544bb643c6621a1e",
+      "firmware/tools/qualify_protocol_v3.py": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
+      "firmware/tools/run_input_isolation.py": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1"
+    },
+    "schema_sha256": {
+      "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+      "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+      "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+    },
+    "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+    "sdk_version": "1.2.0"
+  },
+  "isolated_legacy_sdk": {
+    "outcome": "NOT_RUN"
+  },
+  "local_validation": {
+    "docs-pytest": "11 passed, 1478 subtests passed in 2.69s",
+    "focused2": "126 passed, 6 skipped, 27 subtests passed in 40.80s",
+    "full-pytest": "2681 passed, 11 skipped, 17098 subtests passed in 291.50s (0:04:51)",
+    "grader-pytest": "13 passed in 0.08s"
+  },
+  "outcome": "INCONCLUSIVE",
+  "prerequisites": {
+    "final-identity-validation": {
+      "outcome": "NOT_RUN"
+    },
+    "metadata-grade": {
+      "outcome": "NOT_RUN"
+    },
+    "reset_defaults-grade": {
+      "outcome": "NOT_RUN"
+    }
+  },
+  "regression_before": "BEFORE 8 FAIL SyntheticPatternError v3 synthetic samples differ from deterministic source\nBEFORE 16 FAIL SyntheticPatternError v3 synthetic samples differ from deterministic source\n",
+  "retained_evidence": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/before-regression.log",
+      "sha256": "495f2ce49d95ecdd3918eeca8d901cf7670bb0e692102d81a654d915d0efc88a",
+      "size_bytes": 181
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/build.log",
+      "sha256": "bffbe9270ecee1bd98290cc8534d09bb2da30c6629e32832ed40cb0a397b8509",
+      "size_bytes": 35
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/build_candidate.py",
+      "sha256": "ffbecef7f211990d97cabd9af8d898ab60da0ca117d37c528faf56f408b1aecd",
+      "size_bytes": 683
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/continue_qualification.py",
+      "sha256": "44da12f79b501568eda423b3bfabc0743fb6146d694084cdb96901e9fbc14d20",
+      "size_bytes": 4887
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/docs-pytest.log",
+      "sha256": "a9b0679aefb2b362fe211a1d348469b0fa59a10ecd581c7122d13340e5c4c973",
+      "size_bytes": 83
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/first-build-memory-failed.log",
+      "sha256": "0b174a0ebc01ca12d566aca601e4e513c5eef6b96526fd2784f3ca0618f285f0",
+      "size_bytes": 540
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/first-build.log",
+      "sha256": "dc97d0600a31356b5e9f96a1627e5dce785752dd9853f962e1fff7c7ca56edc6",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/focused.log",
+      "sha256": "828bc2a31fcf7373cfca3dfb8055f34330f889051b899dc6a440c521db57744d",
+      "size_bytes": 49325
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/focused2.log",
+      "sha256": "5e71c6b7d07b4394fcab04f778a6a28150be99b8826fb4d29bcd6a229a71a522",
+      "size_bytes": 200
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/freeze.log",
+      "sha256": "c495bfeacfc5c945093cef25d96000ad8c6a72838097bf5173c56a767b23ca20",
+      "size_bytes": 588
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/freeze_candidate.py",
+      "sha256": "79010601ced49eb8a82a7af0c74b62537b7444c103fb69b7bc6e81dd98ee868c",
+      "size_bytes": 2976
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/full-pytest-before-layout-update.log",
+      "sha256": "07d389349f03240c1fde4c2e3d840f9dfb96ce0307f38993fa7d730896d08b23",
+      "size_bytes": 9942
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/full-pytest.log",
+      "sha256": "a239f0cfa9a107205e618fb0ef0d99981ed6f56864505cfe88628e24f1afbf22",
+      "size_bytes": 3098
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/grade_legacy.py",
+      "sha256": "3633d1262047545abe132df0e50c7d571828ce6e6c5a196b217226eaee639885",
+      "size_bytes": 5829
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/grade_metadata.py",
+      "sha256": "f49276f0b021ec0ee97e340635891781e72504f1325f12cfb2d2f389ca90c601",
+      "size_bytes": 4985
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/grader-pytest.log",
+      "sha256": "be135ec6b2d4fa6b99038fbed587fdbbc2a28cdadb64870aa57ce7cea4ccc48c",
+      "size_bytes": 99
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/historical-evidence-hashes.json",
+      "sha256": "a6b17045956ece43430b51110160eed1c30b9bedec632c2f9cd57dd45180cf1c",
+      "size_bytes": 99914
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/layout-pytest.log",
+      "sha256": "bcf78e19a965d1c7de0d34495dcfa6fe9e26bef5f96c0c0ec3abc5a6d7fe7ac8",
+      "size_bytes": 109
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/legacy_probe.py",
+      "sha256": "18fc20b7b44d1b446693c759cb57eb6d30c0c9f97519727a16fd815e9dedf5b0",
+      "size_bytes": 21216
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/metadata_probe_v2.py",
+      "sha256": "ed4dafb8e87ce8e656bdd69cf93e872bcca912f150d912ef622d83860703af55",
+      "size_bytes": 8494
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/placement-build.log",
+      "sha256": "d9f9fdddac340bdbadcd2c4f4adc6099f04ab0bb1880e8846bf1f2e5ab56c8b3",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/regression.log",
+      "sha256": "6075c7630b3b21daafb67be4a7b5dbe41878534976d95b4701cd01720c893d54",
+      "size_bytes": 1603
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/run_legacy_probe.py",
+      "sha256": "1ca3d7271ea4c2768d709d16b591c67d6370d23075597f79c1e5b00c65ba8718",
+      "size_bytes": 3684
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/run_metadata_v2.py",
+      "sha256": "b6ba82895e3b486ef9827ca7554223d7e370e9692a7bf9e092b6a4f9bef78340",
+      "size_bytes": 3675
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/second-build.log",
+      "sha256": "dc97d0600a31356b5e9f96a1627e5dce785752dd9853f962e1fff7c7ca56edc6",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/status.py",
+      "sha256": "9a2ac03fce1f25cd51cc9348434d3f83e00a212a68d16310f8c09da4ee40e82a",
+      "size_bytes": 906
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/test_grade_legacy.py",
+      "sha256": "c3e7b1f1b3cd130b9866d71d21d26992ffbaa9ceffd5d63f021379f55696ba70",
+      "size_bytes": 5019
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/verify_identity.py",
+      "sha256": "1cf167cb108297c2eb362a0374575fb359df9428ac94b442521c16b8eb1554ca",
+      "size_bytes": 3844
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-synthetic-corrected-20261025/write_report.py",
+      "sha256": "2002fffe2575dbe2ff4b589cb6b882b2e3419da0e62800ca4d551d30bcc12bab",
+      "size_bytes": 9330
+    },
+    {
+      "path": "firmware/soak/protocol-v3-candidate-freeze.json",
+      "sha256": "cd98d041d929b944a8913a4110dc24be5d9ba6e148f1a90c74560472fe37861a",
+      "size_bytes": 129061
+    },
+    {
+      "path": "firmware/soak/protocol-v3-candidate.json",
+      "sha256": "8fb268b1d12816c5bd328f45d2e39510a9662ce001858358c654b2399222737c",
+      "size_bytes": 24171
+    }
+  ],
+  "schema_version": 1,
+  "scope": "synthetic correction, prerequisites and streaming/compatibility; lifecycle/endurance/promotion separate",
+  "source_revision": "6eda739ba1061807d579d016c1f0467963ab1a44",
+  "streaming_cells": [],
+  "streaming_matrix": {
+    "FAIL": 0,
+    "NOT_RUN": 56,
+    "PASS": 0
+  }
+}
