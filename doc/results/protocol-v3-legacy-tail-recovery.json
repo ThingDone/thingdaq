@@ -20,10 +20,18 @@
         "cell_id": "v2-0-3",
         "outcome": "PASS",
         "problems": []
+      },
+      {
+        "cell_id": "v2-1-1",
+        "outcome": "FAIL",
+        "problems": [
+          "retained attempt outcome FAIL",
+          "missing/malformed evidence: 'capabilities_hex'"
+        ]
       }
     ],
     "checks": {
-      "all_attempts_valid": true,
+      "all_attempts_valid": false,
       "matrix_complete": false,
       "physical_evidence_present": true
     },
@@ -85,19 +93,23 @@
       "soak-3",
       "stall-0",
       "stall-1",
-      "v2-1-1",
       "v2-1-2",
       "v2-1-3"
     ],
-    "outcome": "INCONCLUSIVE",
-    "physical_qualification": "INCONCLUSIVE",
+    "outcome": "FAIL",
+    "physical_qualification": "FAIL",
     "policy": "public-v3-qualification-1",
-    "problems": []
+    "problems": [
+      "v2-1-1: retained attempt outcome FAIL",
+      "v2-1-1: missing/malformed evidence: 'capabilities_hex'"
+    ]
   },
   "candidate_sha256": "16f11b967bbf5c59a651adaa196a7f4ebd556b6347b099833588ce546bfcefd5",
   "controller_state": {
     "candidate_sha256": "16f11b967bbf5c59a651adaa196a7f4ebd556b6347b099833588ce546bfcefd5",
-    "stage": "V2_COMPATIBILITY"
+    "cell": "v2-1-1",
+    "error": "ValueError: auxiliary INPUT mode requires the GPIO stream",
+    "stage": "FAIL"
   },
   "correction_commits": [
     "9ca96bf",
@@ -152,7 +164,7 @@
     "full-pytest": "2705 passed, 11 skipped, 17111 subtests passed in 292.00s (0:04:52)",
     "grader-pytest": "20 passed in 0.19s"
   },
-  "outcome": "INCONCLUSIVE",
+  "outcome": "FAIL",
   "prerequisites": {
     "final-identity-validation": {
       "job_id": "1151bcbe-a450-4df9-a900-a7d114793511",
@@ -10204,6 +10216,51 @@
       "size_bytes": 358
     },
     {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/cpu-allocation.json",
+      "sha256": "37271fe46e3f143e5f8e25719d8abacd59290af1a372d2bda795846de15a4b5d",
+      "size_bytes": 232
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/firmware.ino.hex",
+      "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+      "size_bytes": 524284
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/provenance.json",
+      "sha256": "a5a2557289d689a8fa553755435a8593cd2761e49e7b68605370c99ff6fbb0df",
+      "size_bytes": 1677
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/results.json",
+      "sha256": "1039696d438f68e1ecb491defdc1b2175c2f79c66a435c0e4c67866595d05e9d",
+      "size_bytes": 15300
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/rig-program.py",
+      "sha256": "fde764acb05f9f665a8d095bee0534a7bec634b6638168a74603460c05b65420",
+      "size_bytes": 464226
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/start.json",
+      "sha256": "4f14330662638c4d34dca0efb5b2c1d602ef981391a3d091231c2d55039cbd39",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/submission.json",
+      "sha256": "25a9c1f2b05fa2adc0f13ffc022bb9531e0093110a004e08e7e60a15aeff7e5b",
+      "size_bytes": 358
+    },
+    {
       "path": "firmware/soak/protocol-v3-candidate-freeze.json",
       "sha256": "29c193761222f2def5fa37296c532cd5e463f01ea9b5131dca25ed84e7bbce47",
       "size_bytes": 129241
@@ -13585,11 +13642,127 @@
         "raw_result_path": "/home/bill/agents/teensy_daq/.maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-0-3/attempt-001/results.json",
         "rejections": []
       }
+    },
+    {
+      "cell_id": "v2-1-1",
+      "grade": {
+        "cell_id": "v2-1-1",
+        "outcome": "FAIL",
+        "problems": [
+          "retained attempt outcome FAIL",
+          "missing/malformed evidence: 'capabilities_hex'"
+        ]
+      },
+      "job_id": "10d01714-118a-4f4b-bdf5-fe74b48e6b1f",
+      "record": {
+        "candidate_sha256": "16f11b967bbf5c59a651adaa196a7f4ebd556b6347b099833588ce546bfcefd5",
+        "captures": [
+          {
+            "settings_hex": "010001030104011000000c0040420f0040420f00",
+            "temperatures": []
+          }
+        ],
+        "cell": {
+          "cycles": 1,
+          "id": "v2-1-1",
+          "kind": "legacy",
+          "seconds": 60,
+          "settings_hex": "010001030104011000000c0040420f0040420f00"
+        },
+        "cell_id": "v2-1-1",
+        "error": "ValueError: auxiliary INPUT mode requires the GPIO stream",
+        "failure_oracle": {
+          "adc": {
+            "encoded_bytes": 0,
+            "encodings": {},
+            "end_item": 0,
+            "first_host_seconds": 0,
+            "first_ticks": 0,
+            "frames": 0,
+            "gap_items": 0,
+            "items": 0,
+            "last_host_seconds": 0,
+            "last_ticks": 0,
+            "logical_bytes": 0,
+            "next_sequence": 0,
+            "run_ids": [],
+            "sample_checks": 0,
+            "synthetic_checks": 0,
+            "versions": [],
+            "wire_bytes": 0
+          },
+          "errors": 0,
+          "gpio": {
+            "encoded_bytes": 0,
+            "encodings": {},
+            "end_item": 0,
+            "first_host_seconds": 0,
+            "first_ticks": 0,
+            "frames": 0,
+            "gap_items": 0,
+            "items": 0,
+            "last_host_seconds": 0,
+            "last_ticks": 0,
+            "logical_bytes": 0,
+            "next_sequence": 0,
+            "run_ids": [],
+            "sample_checks": 0,
+            "synthetic_checks": 0,
+            "versions": [],
+            "wire_bytes": 0
+          },
+          "partial_bytes": 0,
+          "raw_bytes": 4224,
+          "raw_sha256": "1e4a5f4eb492374ba4c4fd51f7d5a8ebd1149507bcf786420187ae9e520d5923"
+        },
+        "host_setup": {
+          "affinity": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "cpu.max": "200000 100000\n",
+          "cpu.stat": "usage_usec 603008\nuser_usec 562173\nsystem_usec 40835\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 14\nnr_throttled 11\nthrottled_usec 514268\nnr_bursts 0\nburst_usec 0\n",
+          "cpu_count": 4,
+          "cpuset.cpus.effective": "0-3\n",
+          "loadavg": [
+            0.5390625,
+            0.40576171875,
+            0.57568359375
+          ],
+          "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.41",
+          "python": "3.13.15"
+        },
+        "info": {
+          "adc_resolution_bits": 12,
+          "board_id": 1,
+          "build_id": "thingdaq-e0c750868be7c5c2",
+          "clocks": {
+            "adc_clock_hz": 37500000,
+            "cpu_clock_hz": 600000000,
+            "cpu_profile": 1,
+            "ipg_clock_hz": 150000000,
+            "pit_clock_hz": 24000000,
+            "timestamp_hz": 8000000
+          },
+          "firmware_version": "1.2.0",
+          "hardware_serial": "20428100",
+          "mcu_id": 1,
+          "protocol_version": 3,
+          "simulated": false
+        },
+        "job_id": "10d01714-118a-4f4b-bdf5-fe74b48e6b1f",
+        "outcome": "FAIL",
+        "physical": true,
+        "raw_result_path": "/home/bill/agents/teensy_daq/.maestro/playbooks/Working/protocol-v3-qualification-legacy-tail-fixed-20261025/v2-1-1/attempt-001/results.json",
+        "rejections": []
+      }
     }
   ],
   "streaming_matrix": {
-    "FAIL": 0,
-    "NOT_RUN": 53,
+    "FAIL": 1,
+    "NOT_RUN": 52,
     "PASS": 3
   }
 }
