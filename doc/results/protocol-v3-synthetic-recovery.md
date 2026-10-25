@@ -16,7 +16,7 @@ related:
 
 # Synthetic recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **0/56 PASS, 0 FAIL, 56 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **NOT_RUN**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **4/56 PASS, 0 FAIL, 52 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -43,13 +43,17 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 
 | Cell | Grade | Job |
 | --- | --- | --- |
-| final-identity-validation | NOT_RUN |  |
-| metadata-grade | NOT_RUN |  |
-| reset_defaults-grade | NOT_RUN |  |
+| final-identity-validation | PASS | aea0a3af-125c-4f51-8fad-792723a6f8c2 |
+| metadata-grade | PASS | 65c4288b-453f-4183-9c5e-2a077c475e6b |
+| reset_defaults-grade | PASS | 73bc3727-a3fb-4caf-b536-f002872b5c81 |
+| `fallback-0` | PASS | `f6353b13-b675-488a-8c70-a0f1a10a004e` |
+| `fallback-1` | PASS | `cc0b36bb-befc-415c-8cea-d50057f9d063` |
+| `smoke-010001030104000800000c0040420f0040420f00` | PASS | `57c03826-3408-4a5f-93d2-67b47a2989df` |
+| `smoke-030001030104011000000c0040420f0040420f00` | PASS | `c06338d5-4c0e-4e07-94b9-8f7f958fa796` |
 
 ## Continuation and limits
 
-Controller stage at report: `FROZEN`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-synthetic-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-synthetic-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
+Controller stage at report: `STREAMING_MATRIX`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-synthetic-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-synthetic-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
 
 Legacy SDK reference is unchanged revision `3a52ead02791019fcdb0b27a8be869effc955aa2`, archive SHA-256 `6f086090943069ed228b529871a7fe03bbccb2e69c611464a31fa80f340e4e20`. Its physical probe follows the complete streaming matrix. New-SDK/old-v1/v2 results are local fixture/simulator evidence; no old firmware image is claimed physically tested. Programming reset is not power removal. Unstimulated acquisition does not measure analog accuracy, external edge fidelity, power or multi-hour continuous reliability.
 
