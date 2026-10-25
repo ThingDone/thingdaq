@@ -561,7 +561,12 @@ def measured_fixture(cell, run_id=1):
     for name, bit, width in (("adc", 1, 4), ("gpio", 2, settings.gpio_width_bits // 8)):
         active = bool(int(settings.stream_mask) & bit)
         frames = 60000 if active else 0
-        items = frames * 1008
+        layout = policy.GPIOLayout.from_mode(settings.aux_bank_mode)
+        items = frames * (
+            (layout.adc_items_per_frame if name == "adc" else layout.items_per_frame)
+            if cell["kind"] == "legacy"
+            else 1008
+        )
         dropped = 1008 if active and cell["kind"] == "stall" else 0
         wire = worker.empty_stream()
         wire.update(
@@ -601,6 +606,18 @@ def measured_fixture(cell, run_id=1):
         status[f"{name}_codec_deadline_drops"] = 0
         status[f"{name}_codec_resource_drops"] = 0
         status[f"{name}_codec_raw"] = 30000 if active else 0
+    status.update(
+        adc_stop_pairs_discarded=0,
+        adc_raw_pairs_lost=0,
+        adc_incomplete_buffers=0,
+        adc_incomplete_conversions=0,
+        adc_completion_mismatches=0,
+        adc_pairs_captured=status["adc_items_generated"],
+        adc_pairs_delivered=status["adc_items_generated"],
+        gpio_stop_samples_discarded=0,
+        gpio_raw_samples_lost=0,
+        gpio_samples_delivered=status["gpio_items_generated"],
+    )
     return row
 
 
@@ -1310,3 +1327,63 @@ def test_production_legacy_stop_readbacks_do_not_allow_v3_cleanup_stop(cpp):  # 
     assert int(responses[4].value.device_state) == 1
     assert responses[4].value.packet_owned_depth == 0
     assert int(responses[7].error_code) == 7
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "adc_items_dropped",
+        "gpio_items_dropped",
+        "adc_raw_pairs_lost",
+        "gpio_raw_samples_lost",
+        "adc_stop_pairs_discarded",
+        "gpio_stop_samples_discarded",
+        "adc_pairs_captured",
+        "adc_pairs_delivered",
+        "gpio_samples_delivered",
+        "adc_incomplete_buffers",
+        "adc_completion_mismatches",
+        "adc_incomplete_conversions",
+        "adc_bound",
+        "gpio_bound",
+        "missing_tail",
+        "frame_drop",
+        "gap",
+    ],
+)
+def test_retained_legacy_physical_stop_tail_conservation(fault):
+    fixture = json.loads(
+        (TOOLS.parent / "tests/fixtures/legacy_stop_tail_capture.json").read_text()
+    )
+    cell, capture = fixture["cell"], fixture["capture"]
+    status = capture["status"]
+    if fault in status:
+        status[fault] += (
+            10000
+            if fault
+            in (
+                "adc_incomplete_buffers",
+                "adc_completion_mismatches",
+                "adc_incomplete_conversions",
+            )
+            else 1
+        )
+    elif fault == "adc_bound":
+        status["adc_stop_pairs_discarded"] = status["adc_raw_pairs_lost"] = status[
+            "adc_items_dropped"
+        ] = 2024
+        status["adc_pairs_captured"] = status["adc_items_generated"] + 2024
+    elif fault == "gpio_bound":
+        status["gpio_stop_samples_discarded"] = status[
+            "gpio_raw_samples_lost"
+        ] = status["gpio_items_dropped"] = 4048
+    elif fault == "missing_tail":
+        del status["adc_stop_pairs_discarded"]
+    elif fault == "frame_drop":
+        status["adc_frames_dropped"] += 1
+    elif fault == "gap":
+        capture["oracle"]["adc"]["gap_items"] += 1
+        capture["oracle"]["adc"]["end_item"] += 1
+    problems = policy.validate_capture(cell, capture)
+    assert bool(problems) == (fault is not None), (fault, problems)
