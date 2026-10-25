@@ -14,7 +14,7 @@ related:
 
 # Lifecycle hardware qualification: INCONCLUSIVE
 
-Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682`, firmware `827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d`, build `thingdaq-e0c750868be7c5c2`, serial `20428100`. Six selected cells: **4 PASS / 0 FAIL / 1 INCONCLUSIVE / 1 NOT_RUN**. Release promotion remains a separate task.
+Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682`, firmware `827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d`, build `thingdaq-e0c750868be7c5c2`, serial `20428100`. Six selected cells: **5 PASS / 0 FAIL / 1 INCONCLUSIVE / 0 NOT_RUN**. Release promotion remains a separate task.
 
 | Cell | Grade | Job | Captures | Peak °C |
 | --- | --- | --- | --- | --- |
@@ -22,6 +22,16 @@ Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d468
 | stall-0 | PASS | `77c1e293-8433-47a9-8496-1b8f652c1b26` | 1 | 53.246 |
 | stall-1 | PASS | `463bf29a-d500-429c-a911-cd8be13d5452` | 1 | 56.316 |
 | soak-1 | PASS | `494d9c0c-0b16-49b4-bc4b-c0a55705ad82` | 1 | 66.755 |
+| soak-2 | PASS | `fe3aab1a-d798-4e37-b9ca-428c5acf0ae2` | 1 | 67.983 |
+
+## Endurance measurements
+
+| Cell | Seconds | ADC pairs | GPIO samples | Data MB/s | Host cores | Codec work ADC / GPIO (s) |
+| --- | --- | --- | --- | --- | --- | --- |
+| soak-1 | 600.020 | 600,054,336 | 600,050,304 | 3.075 | 0.478 | 33.017 / 7.483 |
+| soak-2 | 600.020 | 600,054,336 | 600,050,304 | 3.075 | 0.478 | 33.019 / 7.483 |
+
+Data MB/s uses decimal bytes and includes data-frame wire overhead. Host cores is process CPU seconds / wall seconds over capture/control boundaries. Codec work is measured wall time inside the codec, including preemption. All raw-encoding counts, deadline margins, loss counters and thermal samples are retained in JSON.
 
 ## Coverage and measurement limits
 
