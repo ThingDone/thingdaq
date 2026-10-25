@@ -124,3 +124,20 @@ uncredited.
 Documentation/layout checks passed 11 tests and 1,435 subtests. A second
 nonblocking lock acquisition was rejected while the detached controller stayed
 alive. No qualification inputs changed.
+
+## Seventh streaming cell
+
+Retained job `0b478afa-5698-4ed8-936f-a1a61d9d817a` completed PASS under
+the existing detached controller, without resubmission. Independent replay
+now gives **7/56 streaming PASS, zero FAIL, 49 incomplete**. The candidate
+freeze and all 84 previously recorded artifact/evidence hashes rechecked PASS.
+Next accepted job `727d6a2b-c38c-4e3b-ad3e-091363f87636` was queued at this
+checkpoint; controller PID 13490 continues waiting under the unchanged queue
+and HTTP retry rules. No new controller or diagnostic was launched. These
+counts and process identifiers are historical; inspect live state before resuming.
+
+Full streaming, isolated pre-upgrade SDK compatibility, lifecycle/endurance
+and promotion remain uncredited. Exact completed-job evidence hashes are
+appended to the JSON continuation ledger.
+
+Documentation/layout validation passed 11 tests and 1,435 subtests.
