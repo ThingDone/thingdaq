@@ -69,3 +69,35 @@ def test_dma_interrupt_order(interrupt_order_executable, scenario):
         check=True,
         capture_output=True,
     )
+
+
+@pytest.fixture(scope="module")
+def stop_boundary_executable(tmp_path_factory):
+    directory = tmp_path_factory.mktemp("adc-stop-boundary")
+    source = (ROOT / "firmware/src/adc_dma_capture_teensy.cpp").read_text()
+    functions = []
+    for signature in (
+        "constexpr std::uint16_t stopBoundaryArmMinimumPairs(",
+        "bool waitForCompleteStopBoundary()",
+    ):
+        start = source.index(signature)
+        end = source.index("\n}\n", start) + 3
+        functions.append(source[start:end])
+    (directory / "adc_dma_stop_under_test.h").write_text("\n".join(functions))
+    executable = directory / "stop-boundary"
+    subprocess.run(
+        ["g++", "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror",
+         f"-I{directory}",
+         str(ROOT / "firmware/tests/adc_dma_stop_boundary_test.cpp"),
+         "-o", str(executable)],
+        check=True, capture_output=True,
+    )
+    return executable
+
+
+@pytest.mark.parametrize("scenario", [
+    "ordinary", "adc0-done", "adc1-done", "both-done", "unprepared",
+    "faulted", "insufficient-headroom",
+])
+def test_stop_boundary_preserves_scatter_gather(stop_boundary_executable, scenario):
+    subprocess.run([str(stop_boundary_executable), scenario], check=True, capture_output=True)
