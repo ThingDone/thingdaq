@@ -16,7 +16,7 @@ related:
 
 # Legacy matrix recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **20/55 PASS, 0 FAIL, 35 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **30/55 PASS, 0 FAIL, 25 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -60,6 +60,16 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | `smoke-010101030104000800010c0040420f0040420f00` | PASS | `a25a516d-9894-4a70-b383-f8740627c3a5` |
 | `smoke-010101030104000801000c0040420f0040420f00` | PASS | `425625fc-6f9c-433f-8672-9aa28b96b5c8` |
 | `smoke-010101030104000801010c0040420f0040420f00` | PASS | `23594d26-b662-4db2-a7f5-82494140cc3c` |
+| `smoke-010101030104011000000c0040420f0040420f00` | PASS | `9e7329bc-0460-4e5b-9b44-3f7b1d50ebd3` |
+| `smoke-010101030104011000010c0040420f0040420f00` | PASS | `9dc5bcd8-b595-44c1-8ed8-120783115f0c` |
+| `smoke-010101030104011001000c0040420f0040420f00` | PASS | `5e1acaac-fad9-4db2-94e5-b4ac320df400` |
+| `smoke-010101030104011001010c0040420f0040420f00` | PASS | `ec8fccfe-817b-4359-a49b-d0ac3c18986b` |
+| `smoke-020001030104000800000c0040420f0040420f00` | PASS | `189c967d-4702-4000-b4e0-9c50416da449` |
+| `smoke-020001030104000800010c0040420f0040420f00` | PASS | `ce487728-24ec-4012-be8e-cee84b40adf8` |
+| `smoke-020001030104000801000c0040420f0040420f00` | PASS | `aa710d55-250e-4c92-9ecc-9adb38b3d46d` |
+| `smoke-020001030104000801010c0040420f0040420f00` | PASS | `4a23a364-b53e-47e7-ae55-7f6895a001ed` |
+| `smoke-020001030104011000000c0040420f0040420f00` | PASS | `de302c94-cafa-4625-9202-d6ff25ea51d8` |
+| `smoke-020001030104011000010c0040420f0040420f00` | PASS | `de1619b7-beb1-444f-9ec2-c5f7bfac160a` |
 | `smoke-030001030104011000000c0040420f0040420f00` | PASS | `d1093f61-3b29-48ea-a8f9-eafa3af55892` |
 | `v2-0-1` | PASS | `a70e9f3c-88da-40d4-abc3-7572fc7cd66d` |
 | `v2-0-2` | PASS | `338c2782-998e-4b63-a64a-f5e53007bc48` |

@@ -152,6 +152,8 @@ The 2026-10-24 active-controller notes below are historical. The retained contro
 
   - 2026-10-25 valid-matrix checkpoint: independent replay **20/55 PASS, zero FAIL, 35 NOT_RUN**, isolated old SDK PASS. ADC-only hardware coverage is complete; synthetic configurations continue. Active freeze and 1,242 + 316 historical hashes PASS. Same controller/candidate/campaign remain active; reports `protocol-v3-legacy-matrix-recovery.md/json` updated. Streaming/later tasks remain unchecked.
 
+  - 2026-10-25 valid-matrix checkpoint: independent replay **30/55 PASS, zero FAIL, 25 NOT_RUN**, isolated old SDK PASS. All ADC-only hardware/synthetic and GPIO8-only hardware cases passed; GPIO16-only hardware cases continue. Active freeze and 1,242 + 316 historical hashes PASS; same controller/candidate/campaign remain active. Updated `protocol-v3-legacy-matrix-recovery.md/json`; streaming/later tasks remain unchecked.
+
 - [ ] Run lifecycle, backpressure, thermal, and endurance qualification:
   - Execute at least twenty same-boot START/STOP/restart cycles, including stop/drain/reconfigure and version-mode changes only between runs. Preserve request correlation and verify final IDLE with all deferred and USB work accounted for.
   - Exercise deliberate bounded host stalls, fragmented/short USB writes where supported by the harness, recovery, and reconnect. Require correct counted drops/gaps for deliberate pressure and no unexplained corruption or stale data.
