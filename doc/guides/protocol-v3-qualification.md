@@ -86,7 +86,7 @@ the release freeze checkpoint.
 
 ## Matrix and acceptance
 
-The normal 600 MHz table currently produces **63 jobs**:
+The normal 600 MHz table currently produces **62 jobs**:
 
 | Cell | Requirement |
 | --- | --- |
@@ -95,8 +95,11 @@ The normal 600 MHz table currently produces **63 jobs**:
 | Default combined endurance | Three 600-second captures in separate reflashed jobs |
 | Host stall | 60 seconds per width, including 250 ms with USB host reads paused; observable firmware drops required |
 | Compression fallback | 60 seconds per width with physical firmware's synthetic source; both RLE and RAW observed |
-| Explicit v2 RAW | 60 seconds for ADC-only, GPIO-only and combined, at each width |
+| Explicit v2 RAW | Five 60-second cases: ADC-only with auxiliary DISABLED; GPIO-only and combined at both widths |
 | Negative settings | Every canonical tuple absent from the advertisement, plus malformed CPU/width/resolution/mask and unsupported rates |
+
+The v2 SDK/specification requires GPIO for auxiliary INPUT; ADC-only INPUT
+remains covered by the advertised v3 cells, not by legacy compatibility.
 
 Each capture is at most 600 seconds. Planning reuses the isolation runner's
 780-second ceiling below the service's 900-second container limit. The

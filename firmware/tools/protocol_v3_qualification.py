@@ -82,6 +82,10 @@ def matrix(payload_hex):
         caps.require_supported(synthetic)
         add(f"fallback-{int(mode)}", "fallback", synthetic, 60)
         for mask in (1, 2, 3):
+            # V2 requires GPIO when the auxiliary bank is INPUT. Its SDK
+            # contract is narrower than the advertised v3 configuration table.
+            if mode == c.AuxBankMode.INPUT and not mask & int(c.StreamMask.GPIO):
+                continue
             legacy = replace(selected, stream_mask=mask, gpio_policy=0, adc_policy=0)
             caps.require_supported(legacy)
             add(f"v2-{int(mode)}-{mask}", "legacy", legacy, 60)
