@@ -1209,3 +1209,104 @@ def test_real_synthetic_generator_reaches_fallback_gate(cpp, width, policies):  
             "gpio missing independent synthetic source check"
             in policy.validate_capture(cell, measured)
         )
+
+
+@pytest.mark.parametrize(
+    "kind,fault",
+    [("legacy", None), ("smoke", None), ("legacy", "drain"), ("legacy", "close")],
+)
+def test_worker_closes_validated_legacy_capture_without_cross_version_stop(
+    monkeypatch, kind, fault
+):
+    frozen = candidate()
+    device = SimulatedV3Device(build_id="thingdaq-test")
+    legacy_device = SimulatedDevice(protocol_version=2)
+    original_info, receive = device.info, device.receive
+    monkeypatch.setattr(
+        device,
+        "info",
+        lambda: replace(
+            original_info(),
+            simulated=False,
+            hardware_serial="12345",
+            firmware_version="1.2.0",
+        ),
+    )
+    sent, mode = [], {"legacy": False}
+
+    def peer(data):
+        version, command_kind = data[4:6]
+        request_id = struct.unpack_from("<I", data, 28)[0]
+        sent.append((version, command_kind))
+        if version == 2 and command_kind == 20:
+            mode["legacy"] = True
+            return legacy_device.receive(data)
+        if version == 3 and command_kind == 20 and mode["legacy"]:
+            # Exact rejection retained in hardware job e942cc96 and reproduced
+            # with production control/runtime in the separate test below.
+            return (
+                encode_v3_frame(
+                    0x94, struct.pack("<HH", 1, 7), flags=0x8000, request_id=request_id
+                ),
+            )
+        return receive(data)
+
+    monkeypatch.setattr(device, "receive", peer)
+
+    def capture(daq, tap, cell, settings, record):
+        measured = measured_fixture(cell)
+        record["captures"].append(measured)
+        assert policy.validate_capture(cell, measured) == []
+        if kind == "legacy":
+            worker.legacy_command(daq, 20)
+        if fault == "drain":
+            raise ValueError("incomplete STOP drain")
+        if fault == "close":
+            close = daq.close
+
+            def failed_close(*, stop=True):
+                close(stop=stop)
+                raise OSError("reader close failure")
+
+            monkeypatch.setattr(daq, "close", failed_close)
+
+    # Measurement values are explicit fixtures; SDK context exit, reader,
+    # commands, error decoding and transport closure remain production code.
+    monkeypatch.setattr(worker, "capture", capture)
+    cell = next(row for row in frozen["matrix"] if row["kind"] == kind)
+    transport = InMemoryTransport(device=device)
+    record = worker.run(frozen, cell, transport)
+    assert record["outcome"] == ("FAIL" if fault else "PASS"), record.get("error")
+    assert not transport.is_open
+    if kind == "legacy" and fault is None:
+        assert [pair for pair in sent if pair[1] == 20] == [(2, 20)]
+    if fault == "drain":
+        assert record["error"] == "ValueError: incomplete STOP drain"
+    if fault == "close":
+        assert record["error"] == "OSError: reader close failure"
+
+
+def test_production_legacy_stop_readbacks_do_not_allow_v3_cleanup_stop(cpp):  # noqa: F811
+    configuration = DAQConfiguration(1, 1, aux_bank_mode=0, rate_profile=4)
+    frames, _ = exchange(
+        cpp,
+        [
+            request(
+                encode_v2_frame(
+                    17, configuration.to_payload(protocol_version=2), request_id=1
+                )
+            ),
+            request(encode_v2_frame(18, request_id=2)),
+            "T 32384",
+            request(encode_v2_frame(20, request_id=3)),
+            request(encode_v2_frame(19, request_id=4)),
+            request(command(29, request_id=5)),
+            request(command(16, request_id=6)),
+            request(command(20, request_id=7)),
+        ],
+    )
+    responses = replies(frames)
+    assert all(responses[i].error_code == 0 for i in range(1, 7))
+    assert int(responses[4].value.device_state) == 1
+    assert responses[4].value.packet_owned_depth == 0
+    assert int(responses[7].error_code) == 7
