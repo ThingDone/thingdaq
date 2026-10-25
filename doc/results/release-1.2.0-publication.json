@@ -1,0 +1,855 @@
+{
+  "audit_evidence": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/audit_publication.py",
+      "sha256": "f0c02cad533c7124a40a94df56ec6ccf0efb04a23978492f14bd3df1968d5a0c",
+      "size_bytes": 4372
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/check_release.py",
+      "sha256": "8a1f89fcc5b6f1d942be2e3242882f56c8fdfba80cf9e08063ad182953e8e48a",
+      "size_bytes": 5216
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/docs-pytest.log",
+      "sha256": "cab4bd8b3c52305138f96328d03d0e0d76e0e01eb56de0300e8223591227f4ba",
+      "size_bytes": 96
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/final-docs-pytest.log",
+      "sha256": "28e3783389a70ae2e1d3fde79e34a55ff46b82d79a82c0c526686618af74c92b",
+      "size_bytes": 79
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/independent-validation.json",
+      "sha256": "f995baffe0c6e7c09c12dd6f54c374fe0dcc52f8b7dcfb4ed80d16f89d7c8708",
+      "size_bytes": 7667
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/reference-validation.json",
+      "sha256": "20bfcad3751940a571919f0978b46b20a42cecb21a29f36006d291e972b624e0",
+      "size_bytes": 785
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-publication-20261025/reference-validation.log",
+      "sha256": "20bfcad3751940a571919f0978b46b20a42cecb21a29f36006d291e972b624e0",
+      "size_bytes": 785
+    }
+  ],
+  "branch": "main",
+  "candidate_sha256": "14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682",
+  "checks": [
+    "git fetch origin main; git ls-remote origin refs/heads/main",
+    "git show origin/main:<path> compared byte-for-byte with each published file",
+    "git merge-base --is-ancestor <candidate/legacy/rollback revision> origin/main",
+    "Reused promotion check_release.py: release bindings, six negative controls, 500 protected inputs, 633 master and 1558 historical evidence hashes",
+    "Verified all promotion retained-evidence hashes and release-manifest binding"
+  ],
+  "created": "2026-10-25",
+  "final_documentation_layout": "11 passed, 1554 subtests passed in 2.65s",
+  "fresh_independent_validation": {
+    "attempts": [
+      {
+        "cell_id": "fallback-0",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "fallback-1",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "same-boot-20",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104000800000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104000800010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104000801000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104000801010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104011000000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104011000010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104011001000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010001030104011001010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104000800000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104000800010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104000801000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104000801010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104011000000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104011000010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104011001000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-010101030104011001010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104000800000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104000800010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104000801000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104000801010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104011000000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104011000010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104011001000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020001030104011001010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104000800000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104000800010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104000801000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104000801010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104011000000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104011000010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104011001000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-020101030104011001010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104000800000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104000800010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104000801000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104000801010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104011000000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104011000010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104011001000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030001030104011001010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104000800000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104000800010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104000801000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104000801010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104011000000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104011000010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104011001000c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "smoke-030101030104011001010c0040420f0040420f00",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "soak-1",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "soak-2",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "soak-3",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "stall-0",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "stall-1",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "unsupported",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "v2-0-1",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "v2-0-2",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "v2-0-3",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "v2-1-2",
+        "outcome": "PASS",
+        "problems": []
+      },
+      {
+        "cell_id": "v2-1-3",
+        "outcome": "PASS",
+        "problems": []
+      }
+    ],
+    "checks": {
+      "all_attempts_valid": true,
+      "matrix_complete": true,
+      "physical_evidence_present": true
+    },
+    "endurance": "three separate reflashed 600-second jobs; lifecycle is same-boot only",
+    "missing_cells": [],
+    "outcome": "PASS",
+    "physical_qualification": "PASS",
+    "policy": "public-v3-qualification-1",
+    "problems": [],
+    "retention_errors": []
+  },
+  "local_artifacts": [
+    {
+      "name": "firmware.ino.hex",
+      "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/firmware.ino.hex",
+      "sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+      "size_bytes": 524284
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen/build-manifest.json",
+      "sha256": "67623f384bda202af48c3268de7d44d94fcc48ffdada593012a00352a4bd421d",
+      "size_bytes": 55667
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/inputs/sdk.zip",
+      "sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+      "size_bytes": 294298
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0-py3-none-any.whl",
+      "sha256": "8ba2f35029405407582ef699e4cad3b2d3a210c93d11ffc0b64cff3eb36ee51c",
+      "size_bytes": 315618
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0.tar.gz",
+      "sha256": "701d4559e426591683eae72773c78d88de80d38e24c30516d860767dbbd0f22f",
+      "size_bytes": 346157
+    }
+  ],
+  "outcome": "PASS",
+  "promotion_evidence_files_verified": 19,
+  "published_commit": "2edf6771325b27e32efba60a53a4ed13e2dd17cd",
+  "published_files": [
+    {
+      "path": "README.md",
+      "sha256": "e8e06a62e8c0716f95f8362bf1b3f7f876b523a2cc2aec67e2c0d41e052fdeb3",
+      "size_bytes": 18183,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/README.md"
+    },
+    {
+      "path": "doc/README.md",
+      "sha256": "5dee3c639f7bec33a967c5b53373f17685943e6fbc904ae0cabf43607ed2639b",
+      "size_bytes": 9358,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/README.md"
+    },
+    {
+      "path": "firmware/soak/protocol-v3-candidate.json",
+      "sha256": "86f123bc77c59c1cf2cb78306d998b93716e1a4ea651327d84bd7c8e59fd879d",
+      "size_bytes": 23973,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/firmware/soak/protocol-v3-candidate.json"
+    },
+    {
+      "path": "firmware/soak/protocol-v3-candidate-freeze.json",
+      "sha256": "496d3e672da1a27346425a45418f67427e5d27e92aabbfb485e614f4437e938e",
+      "size_bytes": 129253,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/firmware/soak/protocol-v3-candidate-freeze.json"
+    },
+    {
+      "path": "firmware/soak/protocol-v3-release.json",
+      "sha256": "1d27bfa1e5cf131e8d1a53498a89e5d7ebfc8744fd1a2a665c12ce79eb47c4e4",
+      "size_bytes": 5993,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/firmware/soak/protocol-v3-release.json"
+    },
+    {
+      "path": "doc/results/release-1.2.0.md",
+      "sha256": "5fc99e81f73cf5a419f1fd7892bf7fa714993616e6119d4444b654b6c5d75440",
+      "size_bytes": 6630,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/release-1.2.0.md"
+    },
+    {
+      "path": "doc/results/release-1.2.0-validation.json",
+      "sha256": "4f4c40bcc658b3efe0858c0634891cce96dccc12ab088df00f5133aa40a9eeeb",
+      "size_bytes": 17464,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/release-1.2.0-validation.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-hardware.md",
+      "sha256": "9630321bcb136180a51784b520af77c43783f7d0b7f359a37aa9545b3bc10ccc",
+      "size_bytes": 12765,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-hardware.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-hardware.json",
+      "sha256": "51a9c5063afafedc2829cc2c7a346447c812eec99f612e57bedf50483db6a68f",
+      "size_bytes": 3693905,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-hardware.json"
+    },
+    {
+      "path": "doc/guides/quickstart.md",
+      "sha256": "e3bc207336ca8a3138f40720e0252a2bf1b326244e0dae6e42d281da2394eafc",
+      "size_bytes": 13190,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/guides/quickstart.md"
+    },
+    {
+      "path": "doc/guides/firmware-builds.md",
+      "sha256": "f09d0f0a855703d56fdf41a26e46229f5eb9574e4bdb0ba3230c156c6a9e9940",
+      "size_bytes": 4875,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/guides/firmware-builds.md"
+    },
+    {
+      "path": "doc/guides/protocol-v3-migration.md",
+      "sha256": "5f894243a7b6fdebe26fab883c3cddd7ddb9f80a5a62f9cb1cf3803a499e9bd0",
+      "size_bytes": 8879,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/guides/protocol-v3-migration.md"
+    },
+    {
+      "path": "doc/guides/protocol-v3-qualification.md",
+      "sha256": "bc8be7b38557ecebe5540fad3c8fbebd46a777f55a9ff7f10b537408e6457d41",
+      "size_bytes": 12395,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/guides/protocol-v3-qualification.md"
+    },
+    {
+      "path": "doc/reference/api-reference.md",
+      "sha256": "d0a19856826ff1666cc0af2b746dbbc10cef65a1a1c080b8c374336934f4c432",
+      "size_bytes": 23814,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/reference/api-reference.md"
+    },
+    {
+      "path": "doc/results/release-1.1.0.md",
+      "sha256": "7ab445dd788119b76d18f10a0d0d63d4fa84d70bd91366f0c6ec0564e3a9db93",
+      "size_bytes": 10216,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/release-1.1.0.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-clock-control.md",
+      "sha256": "bb7eb9a984dd14b25989a6b0ff50436e0c2b8c7ab270192b5f65975a55fdb7e4",
+      "size_bytes": 11708,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-clock-control.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-dma-fault-site.json",
+      "sha256": "6163d6acda652ae8e6fc4f54bc190effa97aa7c4e488488db6614c91ffb9d520",
+      "size_bytes": 16711,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-dma-fault-site.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-dma-fault-site.md",
+      "sha256": "f2684441be8ccee739b44f4ea07d4453ecadf0d73af6c28f4e3d6b669830be16",
+      "size_bytes": 4608,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-dma-fault-site.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-dma-recovery.json",
+      "sha256": "23c008de4aed0b335370c64465fdc569b9f954ff00a87766f407ec77d0210e80",
+      "size_bytes": 59660,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-dma-recovery.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-dma-recovery.md",
+      "sha256": "9b7171ba958f06977cec82d95569ec93d6540e5f0248abef2f29613a8fcab1e6",
+      "size_bytes": 7528,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-dma-recovery.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-adversarial.md",
+      "sha256": "ad3b1f91981eb0c8717ac7e81ca7ec5b412e004b80d9ccdfe97dcff3b804a193",
+      "size_bytes": 5506,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-adversarial.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-codecs.md",
+      "sha256": "4d9a4408f29cfa573f459a52c6a3a6a1cd428dcbf6df7028b7494ea5e9354322",
+      "size_bytes": 5895,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-codecs.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-control.md",
+      "sha256": "6ae0108bcb28c3758a6986f7a39ebbd38132224475b3a4c58867744e7f4b4ea5",
+      "size_bytes": 5191,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-control.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-cross-language.md",
+      "sha256": "ee86c70ff7f8ddbd45d55502a81aae7968bb7e3d05db353c8f10b5fd0a409220",
+      "size_bytes": 4624,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-cross-language.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-inspection.md",
+      "sha256": "94773b715cdfdcbff364bdcca2d8fb52ec0e63848211105fa88c1b6b2f95d0a5",
+      "size_bytes": 12662,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-inspection.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-layouts.md",
+      "sha256": "e20bbd6d182050d720a5fc78feca99e1924ba95f3364a77b49fad6fad267181e",
+      "size_bytes": 5763,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-layouts.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-portable.md",
+      "sha256": "8dff896d53b1da42092bb9a0cc2f66716358771bb3721993e058514ccd313fd7",
+      "size_bytes": 9421,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-portable.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-firmware-transactions.md",
+      "sha256": "80a37663e953ce2ea8c05b73875bc0f11b55023b2d3468e3e762355c0d931791",
+      "size_bytes": 5302,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-firmware-transactions.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-foundation.md",
+      "sha256": "455e03a0d0b96e9a2be5a8fbcf541bd2597bbbf069f764a2211f37c6c800ad44",
+      "size_bytes": 8377,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-foundation.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-overrun-correction.json",
+      "sha256": "0851f3486d3b742a8022f04a8d6dcfe1b46927bb53ae6e3c4cabd016225598dd",
+      "size_bytes": 29180,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-overrun-correction.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-overrun-correction.md",
+      "sha256": "eb804057344849d2d0cc287a3d8e2704e0443bc4ad1fc3b89b447de3edd092cd",
+      "size_bytes": 6153,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-overrun-correction.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-overrun-diagnosis.json",
+      "sha256": "ecdc1d5126659922f4441be081f2d3b7694998bac1a748a92c29ab42dc6ff3d9",
+      "size_bytes": 90361,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-overrun-diagnosis.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-overrun-diagnosis.md",
+      "sha256": "982b8fa462ad33954f1f3a93eff4ec575adf3c93bbeaebfbc45f20d5c821d19f",
+      "size_bytes": 8371,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-overrun-diagnosis.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-overrun-regression.json",
+      "sha256": "ef51c2634ee9c4c64c389d58e590028235cb36b4acd20cab68b336f2d51c41b6",
+      "size_bytes": 6625,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-overrun-regression.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-overrun-regression.md",
+      "sha256": "e327c8caef30d991d7307a6b0e2173a523bbc1e21db1b99914c8a61138f88fca",
+      "size_bytes": 3964,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-overrun-regression.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-requalification.json",
+      "sha256": "99cfff33c017fa09a4d7e03ebbd884d340569791f06e9bb9cd4dc18d19c6cc57",
+      "size_bytes": 442945,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-requalification.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-requalification.md",
+      "sha256": "67eae7b3a9c034eedee992e4764071c82bbb5466037c354f33b1d31173450f3b",
+      "size_bytes": 5920,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-requalification.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-streaming.json",
+      "sha256": "01a4241bcc9ce0babf8e493de1e16a8456c7903eaa3a2fef971c940b2bdbf9d4",
+      "size_bytes": 1652171,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-streaming.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-gpio-streaming.md",
+      "sha256": "321578b48f0acaeb4703908d63434bfaf1812dc69a9d513fca79b03e0a07d32f",
+      "size_bytes": 12606,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-gpio-streaming.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-identity-recovery.json",
+      "sha256": "4376c6f83b062a32e83769218bb75880806aa81552061fd59b212307327920b0",
+      "size_bytes": 78098,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-identity-recovery.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-identity-recovery.md",
+      "sha256": "646db28a698eda3dc7000718bf4b1676e742e6a8a1306bf79cb0e36841ac7d48",
+      "size_bytes": 8221,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-identity-recovery.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-legacy-matrix-recovery.json",
+      "sha256": "ea99488a8891fb86b12406c6b67196f4c6420e218223d313a06d836c2fab4187",
+      "size_bytes": 2507068,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-legacy-matrix-recovery.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-legacy-matrix-recovery.md",
+      "sha256": "897b75ba2bd75c88a01523693a23f67bb1c2c32dc0a910c637c9b49707e30ca7",
+      "size_bytes": 10182,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-legacy-matrix-recovery.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-legacy-recovery.json",
+      "sha256": "ea465535d83481e443776bd0578a4b83e977fd40d67fa77012b599042782da6a",
+      "size_bytes": 499692,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-legacy-recovery.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-legacy-recovery.md",
+      "sha256": "7ade1f3ecb9eb9093fbbeb26216bdcc98e5e8eeb348cdc9337c51faaad1ba05a",
+      "size_bytes": 5407,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-legacy-recovery.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-legacy-tail-recovery.json",
+      "sha256": "4272abf779eb8f51bdd028acc0a4b26f36f635612820e53739b5b232372fab9a",
+      "size_bytes": 506223,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-legacy-tail-recovery.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-legacy-tail-recovery.md",
+      "sha256": "2bc3eba1ec5e7453ce34a4c7a26bf34bad65a0a765fbf064451c98ce4cb73207",
+      "size_bytes": 5055,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-legacy-tail-recovery.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-lifecycle-hardware.json",
+      "sha256": "98912e5e143495541299964a52045879e346d824cb8f02f6803c48831aa7c83c",
+      "size_bytes": 1028753,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-lifecycle-hardware.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-lifecycle-hardware.md",
+      "sha256": "d6e202b1b7424cceaf9dcb500f2c4c22838fa0de2e61d49d534f8d5f2da4db8f",
+      "size_bytes": 4295,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-lifecycle-hardware.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-local-gates.md",
+      "sha256": "95c134818926443167d204322b084190acb76b7d5fa5b7311c70fb740bb58478",
+      "size_bytes": 6282,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-local-gates.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-metadata-hardware.json",
+      "sha256": "b8be8afb05d564780973bcf04d044fef8e3c211e38f692cc66516947bb052564",
+      "size_bytes": 273879,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-metadata-hardware.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-metadata-hardware.md",
+      "sha256": "09d12d2183dbba2a6ebb8d35499171006a9313d0495201dbcb61a3086c9dbe40",
+      "size_bytes": 8440,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-metadata-hardware.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-negotiation.md",
+      "sha256": "7f83585f585201f4242d5dfab613e09638b0bc6c553be74c987e76556297439b",
+      "size_bytes": 6644,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-negotiation.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-prototype.md",
+      "sha256": "358031ad9caed07e41f4216ee18ebb177073f30c7711e6954e12a7eb49853424",
+      "size_bytes": 7262,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-prototype.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-python-inspection.md",
+      "sha256": "15cc12add7b40995c4a4124bd3de4e98ae229c8ec484308b4b7eceb764d44dc5",
+      "size_bytes": 10181,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-python-inspection.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-python-performance.json",
+      "sha256": "04e07115553a3811b923fb928f636961c33d909088229ecae192139c00211ecd",
+      "size_bytes": 21052,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-python-performance.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-python-performance.md",
+      "sha256": "df62e18d40a241e94c1cd3356b1043e2172a3fb63598c960af1e0c1b8241a1b8",
+      "size_bytes": 7121,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-python-performance.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-python.md",
+      "sha256": "b1b4e430e9060be444ee9b7b568355b34d6b56225918f4005897b7d17b1bc5c2",
+      "size_bytes": 9616,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-python.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-release-candidate-validation.json",
+      "sha256": "d631761ff7e60f5a73f54ae274ef8bf36675bb0c4b4ec32cb578e73cacd9fe1c",
+      "size_bytes": 6870,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-release-candidate-validation.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-release-candidate.md",
+      "sha256": "5ffd010c2a9607c920bd904f89695fa150cd85652e73850f5a2ab4aa5bafff10",
+      "size_bytes": 10967,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-release-candidate.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-rig-verification.json",
+      "sha256": "8e4a01ef20fa034d901014fa07c002b6323dd10694cb7d8b94262a00e2d805e4",
+      "size_bytes": 18132,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-rig-verification.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-rig-verification.md",
+      "sha256": "cce015e314c7e8cc3e29c05701f16591910aa5306df34f171eab730256e13f51",
+      "size_bytes": 5495,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-rig-verification.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-streaming-baseline-replay.json",
+      "sha256": "336c6cfb154a49cb2fa04f309d4829e8c73d57f50fde257d1e6ee5cea7caef6e",
+      "size_bytes": 59822,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-streaming-baseline-replay.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-streaming-baseline-replay.md",
+      "sha256": "0b3d2bd95b2596f6e10c0cda74ebb2e6e9cc4314e9b03a39573631e375307577",
+      "size_bytes": 6817,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-streaming-baseline-replay.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-streaming-hardware.json",
+      "sha256": "7ce42f7df99389fa443f63a4e5f91875ec214dd2b72c42ddb5b52b84810145f8",
+      "size_bytes": 65792,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-streaming-hardware.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-streaming-hardware.md",
+      "sha256": "d14b457d611cc1069ee765bc86e7b6506eba498659327483ff05684dab161750",
+      "size_bytes": 6966,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-streaming-hardware.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-streaming-stop-diagnostic.json",
+      "sha256": "d9612ff40ad1d453859919b6120f87f417ea1cb2351e43eca9caad321cbe6ccc",
+      "size_bytes": 66790,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-streaming-stop-diagnostic.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-streaming-stop-diagnostic.md",
+      "sha256": "a2c5727d58d944af36d7ef387bb22bee54a45bcec66088400651aebb685df764",
+      "size_bytes": 5528,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-streaming-stop-diagnostic.md"
+    },
+    {
+      "path": "doc/results/protocol-v3-synthetic-recovery.json",
+      "sha256": "08ab851858215f50dcbba351708b447b8dde089307ee083dc805908c67261c7b",
+      "size_bytes": 2107646,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-synthetic-recovery.json"
+    },
+    {
+      "path": "doc/results/protocol-v3-synthetic-recovery.md",
+      "sha256": "10d54a319c5719881c2219a58cf7e7ea4d1ccb4ca0e8bf2aaf02a90013409e83",
+      "size_bytes": 11202,
+      "url": "https://github.com/ThingDone/thingdaq/blob/2edf6771325b27e32efba60a53a4ed13e2dd17cd/doc/results/protocol-v3-synthetic-recovery.md"
+    }
+  ],
+  "release_reference_validation": {
+    "candidate_sha256": "14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682",
+    "freeze": {
+      "artifact_sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+      "build_id": "thingdaq-e0c750868be7c5c2",
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+      "protected_file_count": 500,
+      "protected_tree_sha256": "d02080ae36ecfb029c2baeda2e2bb42b9f1a3f0e7a7c566a83ac31c91b2a945c",
+      "result": "PASS",
+      "source_id": "e0c750868be7c5c29915dfd9a9e7ed614920e7ab614dbc9ca7a380bb0f488fe1",
+      "staged_directory": ".maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/frozen"
+    },
+    "historical_evidence_references": 1558,
+    "master_report_evidence_references": 633,
+    "negative_controls": 6,
+    "outcome": "PASS"
+  },
+  "remote": "https://github.com/ThingDone/thingdaq.git",
+  "retention": "Raw evidence and frozen binaries remain local and ignored, as documented. Published Git references were verified from the fetched origin/main tree; no HTTP-page availability claim.",
+  "schema_version": 1,
+  "scope": "Final Git publication and retained-reference audit; no rig submissions, firmware rebuild, or package publication.",
+  "source_revisions_reachable_from_origin_main": {
+    "candidate": "94144fd32b35968c3f650d2c5927cfefd4e88343",
+    "legacy_sdk": "3a52ead02791019fcdb0b27a8be869effc955aa2",
+    "rollback": "e3e8417598de7494db3a93d7277ef8f0ec31bc8f"
+  }
+}
